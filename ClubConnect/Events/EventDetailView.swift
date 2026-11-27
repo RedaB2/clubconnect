@@ -101,14 +101,17 @@ struct EventDetailView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(16)
                 .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 17))
+                Button { sheet = .calendar } label: {
+                    Label("Add to Calendar", systemImage: "calendar.badge.plus")
+                }
+                .buttonStyle(.bordered)
+                .tint(Color.primary)
                 if !event.summary.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("About this event").font(.title3.bold()).accessibilityAddTraits(.isHeader)
                         Text(event.summary).font(.body).fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                Button { sheet = .calendar } label: { Label("Add to Calendar", systemImage: "calendar.badge.plus") }
-                    .buttonStyle(.bordered)
             }
             .padding(20)
             .frame(maxWidth: 700)
