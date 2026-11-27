@@ -12,7 +12,7 @@ Open the **ClubConnect** scheme in `ClubConnect.xcodeproj` with Xcode 27.2. Sele
 - **Explore the sample community** opens fictional student and alumni profiles and three upcoming campus events. Sample changes persist on that device. Organizers can try publishing an event and checking in their own sample ticket. Wallet passes are issued for live events.
 - **Organizers** redeem their private one-time invitation in Profile. The club page includes the public invitation, editable identity, colors and logo. Saved events appear in the community's Events tab.
 - **At the door**, open the event's organizer menu and choose **Check in members**. Scan the member's QR code or enter their ticket code. The shared backend binds the ticket to the event and records a single successful check-in.
-- **Internal TestFlight** uses the MENASA Pilot group. Internal testers need eligible App Store Connect user access. The club invitation opens the app for someone who has installed it. TestFlight enrollment is managed separately. [App Store Connect](https://appstoreconnect.apple.com/apps/6840182659/testflight) · [Club invitation](https://redab2.github.io/clubconnect/?club=menasa)
+- **Internal TestFlight** build 1.0 (1) is available in the MENASA Pilot group. Internal testers need eligible App Store Connect user access. The club invitation opens the app for someone who has installed it. TestFlight enrollment is managed separately. [App Store Connect](https://appstoreconnect.apple.com/apps/6840182659/testflight) · [Club invitation](https://redab2.github.io/clubconnect/?club=menasa)
 
 ## Shared service
 

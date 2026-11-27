@@ -3,6 +3,7 @@ import XCTest
 @MainActor
 final class PilotFlowTests: XCTestCase {
     override func setUpWithError() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone, "These flows exercise the iPhone tab bar and compact navigation.")
         continueAfterFailure = false
     }
 
@@ -86,9 +87,8 @@ final class PilotFlowTests: XCTestCase {
         let device = XCUIDevice.shared
         let original = device.appearance
         defer { device.appearance = original }
-        device.appearance = .dark
-
         let app = launchDemo()
+        device.appearance = .dark
         app.tabBars.buttons["Events"].tap()
         app.buttons["event-a1000000-0000-4000-8000-000000000001"].tap()
         XCTAssertTrue(app.buttons["RSVP"].waitForExistence(timeout: 5))
