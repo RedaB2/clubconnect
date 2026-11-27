@@ -13,12 +13,12 @@ final class CampusClubsTests: XCTestCase {
         app.buttons["select-club-menasa"].tap()
         let memberMode = app.switches["member-view-toggle"].firstMatch
         XCTAssertTrue(memberMode.waitForExistence(timeout: 5))
-        memberMode.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+        tapRoleSwitch(memberMode, in: app)
         XCTAssertEqual(memberMode.value as? String, "1")
         app.tabBars.buttons["Events"].tap()
         XCTAssertFalse(app.buttons["Create event"].exists)
         app.tabBars.buttons["Clubs"].tap()
-        memberMode.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+        tapRoleSwitch(memberMode, in: app)
         app.navigationBars.buttons.element(boundBy: 0).tap()
         app.buttons["Create a club"].tap()
         app.textFields["Club name"].tap()
@@ -32,5 +32,12 @@ final class CampusClubsTests: XCTestCase {
         app.buttons["MENASA"].tap()
         XCTAssertTrue(app.buttons["event-a1000000-0000-4000-8000-000000000001"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["Create event"].exists)
+    }
+
+    private func tapRoleSwitch(_ control: XCUIElement, in app: XCUIApplication) {
+        // A tall agenda can place the switch underneath the floating tab bar.
+        let visibleBottom = app.tabBars.firstMatch.frame.minY
+        if control.frame.maxY >= visibleBottom { app.swipeUp() }
+        control.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
     }
 }

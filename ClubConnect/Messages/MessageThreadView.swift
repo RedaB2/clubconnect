@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct MessageThreadView: View {
+    @Environment(\.brandTheme) private var theme
     @Environment(ClubStore.self) private var store
     @Environment(\.scenePhase) private var scene
     let member: Member
@@ -35,6 +36,7 @@ struct MessageThreadView: View {
                 }.padding(.horizontal).padding(.vertical, 10)
             }
             .scrollDismissesKeyboard(.interactively)
+            .background(theme.canvas)
             .onChange(of: scrollTarget) { _, id in
                 if let id { reader.scrollTo(id, anchor: .bottom) }
             }
@@ -85,7 +87,7 @@ struct MessageThreadView: View {
             VStack(alignment: mine ? .trailing : .leading, spacing: 3) {
                 Text(message.body).textSelection(.enabled)
                     .padding(.horizontal, 13).padding(.vertical, 8)
-                    .background(mine ? store.club.brandColor.opacity(0.16) : Color(uiColor: .secondarySystemBackground),
+                    .background(mine ? theme.wash : theme.surface,
                                 in: RoundedRectangle(cornerRadius: 16))
                 HStack(spacing: 5) {
                     Text(message.sentAt.formatted(date: .omitted, time: .shortened))

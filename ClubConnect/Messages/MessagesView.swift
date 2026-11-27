@@ -9,6 +9,7 @@ struct MessageMemberButton: View {
 
 struct MessagesView: View {
     @Environment(ClubStore.self) private var store
+    @Environment(\.brandTheme) private var theme
     @Environment(\.scenePhase) private var scene
     @State private var threads: [InboxConversation] = []
     @State private var queue: [DirectMessage] = []
@@ -44,7 +45,7 @@ struct MessagesView: View {
                                 Text((row.latest.sender == store.me.id ? "You: " : "") + row.latest.body)
                                     .font(.subheadline).foregroundStyle(row.unread > 0 ? .primary : .secondary).lineLimit(2)
                                 if row.unread > 0 {
-                                    Text("\(row.unread) unread").font(.caption.weight(.semibold)).foregroundStyle(store.club.accent)
+                                    Text("\(row.unread) unread").font(.caption.weight(.semibold)).foregroundStyle(theme.accent)
                                 }
                             }
                         }.padding(.vertical, 4)
@@ -53,6 +54,7 @@ struct MessagesView: View {
                 if older { Button("Earlier conversations") { Task { await loadOlder() } } }
             }
             .listStyle(.plain)
+            .brandListBackground()
             .overlay {
                 if loading && rows.isEmpty { ProgressView("Loading messages") }
                 else if rows.isEmpty && problem == nil {
@@ -92,6 +94,7 @@ struct MessagesView: View {
                             }
                         }
                     }
+                    .brandListBackground()
                     .overlay { if recipients.isEmpty { ContentUnavailableView.search(text: query) } }
                     .searchable(text: $query, prompt: "Search members")
                     .navigationTitle("New message")

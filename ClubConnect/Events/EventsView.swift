@@ -2,6 +2,7 @@ import SwiftUI
 
 struct EventsView: View {
     @Environment(ClubStore.self) private var store
+    @Environment(\.brandTheme) private var theme
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var selection: String?
@@ -74,10 +75,10 @@ struct EventsView: View {
             .frame(maxWidth: 740)
             .frame(maxWidth: .infinity)
         }
-        .background(Color(uiColor: .systemGroupedBackground))
+        .background(theme.canvas)
         .refreshable { await store.refresh() }
         .navigationTitle("Events")
-            .toolbar { ToolbarItem(placement: .topBarLeading) { ActiveClubMenu() } }
+        .toolbar { ToolbarItem(placement: .topBarLeading) { ActiveClubMenu() } }
         .toolbar {
             if store.isAdmin {
                 ToolbarItem(placement: createPlacement) {
@@ -102,17 +103,17 @@ struct EventsView: View {
 
     private var filteredEvents: [ClubEvent] {
         let today = Date()
-        let registeredIDs = Set(store.tickets.map(\.eventID))
-        return store.events.filter { event in
-            switch filter {
-            case .upcoming: event.endsAt >= today
-            case .going: registeredIDs.contains(event.id)
-            case .past: event.endsAt < today
+        switch filter {
+        case .upcoming:
+            return store.upcomingEvents(at: today)
+        case .past:
+            return store.events.filter { $0.endsAt <= today }.sorted { $0.startsAt > $1.startsAt }
+        case .going:
+            let registeredIDs = Set(store.tickets.map(\.eventID))
+            return store.events.filter { registeredIDs.contains($0.id) }.sorted { lhs, rhs in
+                if (lhs.endsAt <= today) != (rhs.endsAt <= today) { return lhs.endsAt > today }
+                return lhs.startsAt < rhs.startsAt
             }
-        }.sorted { lhs, rhs in
-            if filter == .past { return lhs.startsAt > rhs.startsAt }
-            if filter == .going, (lhs.endsAt < today) != (rhs.endsAt < today) { return lhs.endsAt >= today }
-            return lhs.startsAt < rhs.startsAt
         }
     }
 
@@ -129,7 +130,7 @@ struct EventsView: View {
                     .accessibilityIdentifier("event-\(event.id)")
                 }
             }
-            .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
+            .background(theme.surface, in: RoundedRectangle(cornerRadius: 20))
         }
     }
 
@@ -168,6 +169,7 @@ private enum EventFilter: String, CaseIterable {
 
 private struct FeaturedEventCard: View {
     @Environment(ClubStore.self) private var store
+    @Environment(\.brandTheme) private var theme
     @Environment(\.dynamicTypeSize) private var typeSize
     let event: ClubEvent
 
@@ -176,13 +178,13 @@ private struct FeaturedEventCard: View {
             if !typeSize.isAccessibilitySize {
                 ZStack(alignment: .topLeading) {
                     if let artwork = event.bundledArtwork {
-                        Rectangle().fill(store.club.accent.opacity(0.2))
+                        Rectangle().fill(theme.wash)
                             .overlay { Image(artwork).resizable().scaledToFill() }
                             .clipped()
                     } else {
-                        LinearGradient(colors: [store.club.accent.opacity(0.12), store.club.accent.opacity(0.28)],
+                        LinearGradient(colors: [theme.wash, theme.accent.opacity(0.22)],
                                        startPoint: .topLeading, endPoint: .bottomTrailing)
-                            .overlay { CommunityMark(logoData: store.club.logoData, side: 76) }
+                            .overlay { ClubBadge(club: store.club, side: 76) }
                     }
                     EventDateTile(date: event.startsAt, onImage: true).padding(14)
                 }
@@ -196,17 +198,18 @@ private struct FeaturedEventCard: View {
                 } else if !event.category.isEmpty {
                     Text(event.category.uppercased())
                         .font(.caption2.weight(.bold)).tracking(1.2)
-                        .foregroundStyle(Color.primary.opacity(0.68))
+                        .foregroundStyle(theme.accent)
                 }
                 Text(event.title)
                     .font(.system(.title, design: .serif, weight: .semibold))
+                    .foregroundStyle(theme.ink)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Label(event.location, systemImage: "mappin")
                     .font(.subheadline).foregroundStyle(Color.primary.opacity(0.68))
             }
             .padding(18)
         }
-        .background(Color(uiColor: .secondarySystemGroupedBackground))
+        .background(theme.surface)
         .clipShape(RoundedRectangle(cornerRadius: 22))
         .contentShape(RoundedRectangle(cornerRadius: 22))
         .accessibilityElement(children: .combine)
@@ -251,7 +254,8 @@ private struct EventListRow: View {
     }
 }
 
-private struct EventDateTile: View {
+struct EventDateTile: View {
+    @Environment(\.brandTheme) private var theme
     let date: Date
     var onImage = false
     @ScaledMetric(relativeTo: .body) private var minWidth: CGFloat = 48
@@ -266,8 +270,8 @@ private struct EventDateTile: View {
         .padding(.vertical, 7)
         .padding(.horizontal, 5)
         .frame(minWidth: minWidth)
-        .foregroundStyle(onImage ? Color(red: 0.17, green: 0.18, blue: 0.13) : .primary)
-        .background(onImage ? Color(red: 1, green: 0.98, blue: 0.93) : Color(uiColor: .tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
+        .foregroundStyle(onImage ? theme.ink : theme.accent)
+        .background(onImage ? theme.surface : theme.wash, in: RoundedRectangle(cornerRadius: 12))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(date.formatted(date: .complete, time: .omitted))
     }

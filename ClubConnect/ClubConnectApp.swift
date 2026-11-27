@@ -8,7 +8,7 @@ struct ClubConnectApp: App {
         WindowGroup {
             AppRoot()
                 .environment(store)
-                .tint(store.club.accent)
+                .brandScope()
         }
     }
 }
@@ -44,6 +44,8 @@ private struct AppRoot: View {
     @State private var tab = Destination.events
     @State private var route: Invitation?
     @State private var linkedEvent: EventLink?
+    @State private var linkedClubID: String?
+    @State private var eventsListID = UUID()
     @State private var switchCommunity = false
     @State private var joinInvitation: ClubListing?
 
@@ -67,7 +69,7 @@ private struct AppRoot: View {
         }
         .task { await store.start(); followLink() }
         .onChange(of: store.phase) { _, phase in
-            if phase != .community { tab = .events; linkedEvent = nil }
+            if phase != .community { tab = .events; linkedEvent = nil; linkedClubID = nil }
             followLink()
         }
         .onChange(of: scenePhase) { _, phase in
@@ -90,6 +92,7 @@ private struct AppRoot: View {
                 EventDetailView(eventID: item.id)
                     .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { linkedEvent = nil } } }
             }
+            .brandScope(store.club)
         }
         .confirmationDialog("Open the shared community?", isPresented: $switchCommunity, titleVisibility: .visible) {
             Button(store.isPreview ? "Leave sample and sign in" : "Open sample community") {
@@ -124,20 +127,30 @@ private struct AppRoot: View {
     @ViewBuilder private var tabs: some View {
         if #available(iOS 18, *) {
             TabView(selection: $tab) {
-                Tab("Events", systemImage: "calendar", value: .events) { EventsView().id(store.club.id) }
-                Tab("People", systemImage: "person.2", value: .people) { PeopleView().id(store.club.id) }
-                Tab("Clubs", systemImage: "building.columns", value: .club) { ClubView() }
-                Tab("Messages", systemImage: "bubble.left.and.bubble.right", value: .messages) { MessagesView().id(store.club.id) }
+                Tab("Events", systemImage: "calendar", value: .events) { clubEvents }
+                Tab("People", systemImage: "person.2", value: .people) { clubPeople }
+                Tab("Clubs", systemImage: "building.columns", value: .club) { campusClubs }
+                Tab("Messages", systemImage: "bubble.left.and.bubble.right", value: .messages) { clubMessages }
                 Tab("Profile", systemImage: "person.crop.circle", value: .profile) { MyProfileView() }
             }.tabViewStyle(.sidebarAdaptable)
         } else {
             TabView(selection: $tab) {
-                EventsView().id(store.club.id).tabItem { Label("Events", systemImage: "calendar") }.tag(Destination.events)
-                PeopleView().id(store.club.id).tabItem { Label("People", systemImage: "person.2") }.tag(Destination.people)
-                ClubView().tabItem { Label("Clubs", systemImage: "building.columns") }.tag(Destination.club)
-                MessagesView().id(store.club.id).tabItem { Label("Messages", systemImage: "bubble.left.and.bubble.right") }.tag(Destination.messages)
+                clubEvents.tabItem { Label("Events", systemImage: "calendar") }.tag(Destination.events)
+                clubPeople.tabItem { Label("People", systemImage: "person.2") }.tag(Destination.people)
+                campusClubs.tabItem { Label("Clubs", systemImage: "building.columns") }.tag(Destination.club)
+                clubMessages.tabItem { Label("Messages", systemImage: "bubble.left.and.bubble.right") }.tag(Destination.messages)
                 MyProfileView().tabItem { Label("Profile", systemImage: "person.crop.circle") }.tag(Destination.profile)
             }
+        }
+    }
+
+    private var clubEvents: some View { EventsView().brandScope(store.club).id(store.club.id).id(eventsListID) }
+    private var clubPeople: some View { PeopleView().brandScope(store.club).id(store.club.id) }
+    private var clubMessages: some View { MessagesView().brandScope(store.club).id(store.club.id) }
+    private var campusClubs: some View {
+        ClubView(invitedClub: $linkedClubID) {
+            eventsListID = UUID()
+            tab = .events
         }
     }
 
@@ -173,6 +186,7 @@ private struct AppRoot: View {
             tab = .events
             linkedEvent = EventLink(id: id)
         } else {
+            linkedClubID = route.clubID
             tab = .club
         }
     }

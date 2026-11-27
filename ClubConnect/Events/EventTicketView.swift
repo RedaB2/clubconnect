@@ -3,6 +3,7 @@ import SwiftUI
 
 struct EventTicketView: View {
     @Environment(ClubStore.self) private var store
+    @Environment(\.brandTheme) private var theme
     @Environment(\.dismiss) private var dismiss
     @State private var cancelling = false
     @State private var loading = false
@@ -19,7 +20,7 @@ struct EventTicketView: View {
                     VStack(spacing: 22) {
                         VStack(spacing: 6) {
                             Label(ticket.checkedIn ? "Checked in" : "Going", systemImage: "checkmark.circle.fill")
-                                .font(.subheadline.weight(.semibold)).foregroundStyle(store.club.accent)
+                                .font(.subheadline.weight(.semibold)).foregroundStyle(theme.accent)
                             Text(event.title)
                                 .font(.system(.title, design: .serif, weight: .semibold))
                                 .multilineTextAlignment(.center)
@@ -51,7 +52,7 @@ struct EventTicketView: View {
                     }
                     .padding(24)
                     .frame(maxWidth: 460)
-                    .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 24))
+                    .background(theme.surface, in: RoundedRectangle(cornerRadius: 24))
                     .padding()
                     if !ticket.checkedIn, event.endsAt > .now {
                         Button("Cancel RSVP", role: .destructive) { cancelling = true }
@@ -62,7 +63,7 @@ struct EventTicketView: View {
                 }
             }
             .frame(maxWidth: .infinity)
-            .background(Color(uiColor: .systemGroupedBackground))
+            .background(theme.canvas)
             .navigationTitle("Your ticket")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

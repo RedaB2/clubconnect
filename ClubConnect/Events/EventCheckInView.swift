@@ -49,6 +49,7 @@ struct EventCheckInView: View {
                 }
             }
             .disabled(!store.isAdmin)
+            .brandListBackground()
             .navigationTitle("Check-in")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

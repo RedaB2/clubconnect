@@ -2,6 +2,7 @@ import SwiftUI
 
 struct WelcomeView: View {
     @Environment(ClubStore.self) private var store
+    @Environment(\.brandTheme) private var theme
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var signingIn = false
     let sampleInvitation: Bool
@@ -11,7 +12,7 @@ struct WelcomeView: View {
             VStack(alignment: .leading, spacing: 22) {
                 HStack(spacing: 10) {
                     Image("ClubMark").resizable().frame(width: 34, height: 34).accessibilityHidden(true)
-                    Text("Club Connect").font(.headline)
+                    Text("Club Connect").font(.headline).foregroundStyle(theme.ink)
                 }
                 Image("Gathering")
                     .resizable().scaledToFill()
@@ -21,12 +22,14 @@ struct WelcomeView: View {
                 VStack(alignment: .leading, spacing: 9) {
                     Text("Your campus community")
                         .font(.system(.largeTitle, design: .serif, weight: .semibold))
+                        .foregroundStyle(theme.ink)
                         .accessibilityAddTraits(.isHeader)
                     Text("Discover USC clubs, meet students and alumni, and keep your event tickets together.")
                         .foregroundStyle(.secondary)
                 }
                 Button { signingIn = true } label: {
                     Text("Continue with USC email").font(.headline)
+                        .foregroundStyle(BrandTheme.label(on: theme.accent))
                         .frame(maxWidth: .infinity, minHeight: 34)
                 }
                 .buttonStyle(.borderedProminent)
@@ -42,6 +45,7 @@ struct WelcomeView: View {
             .padding(24).frame(maxWidth: 580)
             .frame(maxWidth: .infinity)
         }
+        .background(theme.canvas)
         .sheet(isPresented: $signingIn) { USCSignInView() }
     }
 }
@@ -99,6 +103,7 @@ private struct USCSignInView: View {
                 if let problem { Text(problem).foregroundStyle(.secondary).accessibilityLabel("Sign-in error. " + problem) }
             }
             .disabled(busy)
+            .brandListBackground()
             .navigationTitle(sent ? "Check your email" : "Sign in")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } } }
@@ -180,6 +185,7 @@ struct EnrollmentView: View {
                     if let problem { Text(problem).font(.footnote).foregroundStyle(.secondary) }
                 } footer: { Text("Your name and profile details are visible to members of the clubs you join.") }
             }
+            .brandListBackground()
             .disabled(saving)
             .navigationTitle(store.completingProfile ? "Complete your profile" : "Join Club Connect")
             .toolbar { ToolbarItem(placement: .cancellationAction) {

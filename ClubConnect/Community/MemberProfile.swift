@@ -85,6 +85,7 @@ private struct OrganizerInvitationView: View {
                     Text("Use the one-time code provided by your club to manage events and club settings.")
                 }
             }
+            .brandListBackground()
             .navigationTitle("Organizer invitation")
             .navigationBarTitleDisplayMode(.inline)
             .interactiveDismissDisabled(submitting)
@@ -113,6 +114,7 @@ private struct OrganizerInvitationView: View {
 }
 
 struct MemberProfile<Footer: View>: View {
+    @Environment(\.brandTheme) private var theme
     let member: Member
     @ViewBuilder var footer: () -> Footer
 
@@ -129,6 +131,7 @@ struct MemberProfile<Footer: View>: View {
                     VStack(spacing: 5) {
                         Text(member.name)
                             .font(.system(.largeTitle, design: .serif, weight: .medium))
+                            .foregroundStyle(theme.ink)
                             .accessibilityAddTraits(.isHeader)
                         Text(member.effectiveKind()?.communityTitle ?? "Graduation term needed")
                             .font(.subheadline.weight(.medium))
@@ -168,6 +171,7 @@ struct MemberProfile<Footer: View>: View {
             footer()
         }
         .listStyle(.insetGrouped)
+        .brandListBackground()
     }
 }
 
@@ -226,6 +230,7 @@ private struct ProfileEditor: View {
                         .lineLimit(3...8)
                 }
             }
+            .brandListBackground()
             .navigationTitle("Edit profile")
             .navigationBarTitleDisplayMode(.inline)
             .disabled(saving)

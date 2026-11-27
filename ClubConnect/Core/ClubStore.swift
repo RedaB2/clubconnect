@@ -33,6 +33,9 @@ final class ClubStore {
     var me: Member { members.first { $0.id == state.myID } ?? Member(id: state.myID, name: "Member", kind: .student) }
     var isAdmin: Bool { hasOrganizerRole && !viewingAsMember }
     var events: [ClubEvent] { state.events }
+    func upcomingEvents(at now: Date) -> [ClubEvent] {
+        events.filter { $0.endsAt > now }.sorted { ($0.startsAt, $0.id) < ($1.startsAt, $1.id) }
+    }
     var tickets: [EventTicket] { state.tickets }
     var walletAvailable: Bool { phase == .community && auth.hasSession }
     var inviteURL: URL { PilotConfiguration.invitePage.appending(queryItems: [.init(name: "club", value: club.id)]) }
@@ -213,7 +216,8 @@ final class ClubStore {
         try await serialized {
             let id = self.creationID(for: name)
             if self.isPreview {
-                let club = Club(id: id, name: name, fullName: name, about: "", accentHex: "#974A30")
+                let club = Club(id: id, name: name, fullName: name, about: "",
+                                accentHex: Club.defaultPrimaryHex, secondaryHex: Club.defaultSecondaryHex)
                 try self.persist(CommunityState(club: club, members: [self.me], events: [], tickets: [], myID: self.me.id, isAdmin: true))
             } else { try await self.readLiveState("create_campus_club", body: self.encode(["c":id, "title":name])) }
             self.pendingCreation = nil

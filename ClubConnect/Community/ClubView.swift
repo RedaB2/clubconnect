@@ -22,34 +22,61 @@ struct ActiveClubMenu: View {
     }
 }
 
+private enum ClubRoute: Hashable {
+    case club(String)
+    case event(club: String, event: String)
+
+    var clubID: String {
+        switch self {
+        case .club(let id), .event(let id, _): id
+        }
+    }
+}
+
 struct ClubView: View {
     @Environment(ClubStore.self) private var store
+    @Environment(\.brandTheme) private var theme
+    @Binding var invitedClub: String?
+    let onShowEvents: () -> Void
     @State private var query = ""
-    @State private var detail = false
+    @State private var path: [ClubRoute] = []
     @State private var creating = false
     @State private var joining: ClubListing?
     @State private var busy = false
 
+    init(invitedClub: Binding<String?>, onShowEvents: @escaping () -> Void) {
+        _invitedClub = invitedClub
+        self.onShowEvents = onShowEvents
+    }
+
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             List {
                 let matches = store.catalog.filter { query.isEmpty || $0.club.name.localizedStandardContains(query) || $0.club.fullName.localizedStandardContains(query) }
-                Section("My clubs") {
-                    ForEach(matches.filter(\.joined)) { entry in
-                        Button {
-                            perform {
-                                try await store.selectClub(entry.id)
-                                detail = true
-                            }
-                        } label: { clubRow(entry, joined: true) }
-                        .accessibilityIdentifier("select-club-" + entry.id)
+                let memberships = matches.filter(\.joined)
+                let available = matches.filter { !$0.joined && $0.canJoin }
+                if memberships.isEmpty && available.isEmpty && !query.isEmpty {
+                    ContentUnavailableView.search(text: query)
+                        .listRowBackground(Color.clear)
+                }
+                if !memberships.isEmpty {
+                    Section("My clubs") {
+                        ForEach(memberships) { entry in
+                            Button {
+                                perform {
+                                    try await store.selectClub(entry.id)
+                                    path = [.club(entry.id)]
+                                }
+                            } label: { clubRow(entry, joined: true) }
+                            .accessibilityIdentifier("select-club-" + entry.id)
+                        }
                     }
                 }
-                let available = matches.filter { !$0.joined && $0.canJoin }
                 if !available.isEmpty {
                     Section("Discover clubs") {
                         ForEach(available) { entry in
                             Button { joining = entry } label: { clubRow(entry, joined: false) }
+                                .accessibilityIdentifier("discover-club-" + entry.id)
                         }
                     }
                 }
@@ -60,7 +87,8 @@ struct ClubView: View {
                 }
             }
             .disabled(busy)
-            .navigationTitle("Clubs")
+            .navigationTitle("Campus clubs")
+            .brandListBackground()
             .searchable(text: $query, prompt: "Find a club")
             .refreshable { await store.refresh() }
             .toolbar {
@@ -68,8 +96,20 @@ struct ClubView: View {
                     Button { creating = true } label: { Label("Create a club", systemImage: "plus") }
                 }
             }
-            .navigationDestination(isPresented: $detail) { CurrentClubView() }
-            .sheet(isPresented: $creating) { CreateClubView { detail = true } }
+            .navigationDestination(for: ClubRoute.self) { route in
+                if route.clubID == store.club.id {
+                    switch route {
+                    case .club(let id):
+                        CurrentClubView(onShowEvents: onShowEvents) { eventID in path.append(.event(club: id, event: eventID)) }
+                            .id(id)
+                            .brandScope(store.club)
+                    case .event(_, let eventID):
+                        EventDetailView(eventID: eventID)
+                            .brandScope(store.club)
+                    }
+                }
+            }
+            .sheet(isPresented: $creating) { CreateClubView { path = [.club(store.club.id)] } }
             .sheet(item: $joining) { entry in
                 NavigationStack {
                     List {
@@ -79,25 +119,41 @@ struct ClubView: View {
                             perform {
                                 try await store.joinAdditionalClub(entry.id)
                                 joining = nil
-                                detail = true
+                                path = [.club(entry.id)]
                             }
                         }.disabled(busy)
                     }
                     .navigationTitle("Join club").navigationBarTitleDisplayMode(.inline)
+                    .brandListBackground()
                     .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { joining = nil } } }
                 }
+                .brandScope(entry.club)
+            }
+        }
+        .onChange(of: invitedClub, initial: true) { _, _ in openInvitation() }
+        .onChange(of: store.club.id, initial: true) { _, clubID in
+            if invitedClub == clubID {
+                openInvitation()
+            } else if let route = path.first, route.clubID != clubID {
+                // A switch from another tab discards the previous club’s pushed event.
+                path = [.club(clubID)]
             }
         }
     }
 
+    private func openInvitation() {
+        guard let invitedClub, invitedClub == store.club.id else { return }
+        path = [.club(invitedClub)]
+        self.invitedClub = nil
+    }
+
     private func clubRow(_ entry: ClubListing, joined: Bool) -> some View {
         HStack(spacing: 12) {
-            CommunityMark(logoData: entry.club.logoData, side: 36)
-                .padding(5).background(entry.club.secondaryBrandColor.opacity(0.12), in: .rect(cornerRadius: 12))
+            ClubBadge(club: entry.club, side: 44)
             VStack(alignment: .leading, spacing: 4) {
-                Text(entry.club.name).font(.headline).foregroundStyle(.primary)
-                if joined { Text(entry.isAdmin ? "Organizer" : "Member").font(.subheadline).foregroundStyle(.secondary) }
-                else if entry.club.fullName != entry.club.name { Text(entry.club.fullName).font(.subheadline).foregroundStyle(.secondary) }
+                Text(entry.club.name).font(.headline).foregroundStyle(theme.ink)
+                if joined { Text(entry.isAdmin ? "Organizer" : "Member").font(.subheadline).foregroundStyle(theme.ink.opacity(0.74)) }
+                else if entry.club.fullName != entry.club.name { Text(entry.club.fullName).font(.subheadline).foregroundStyle(theme.ink.opacity(0.74)) }
             }
             Spacer()
             if entry.id == store.club.id { Image(systemName: "checkmark.circle.fill").accessibilityLabel("Active club") }
@@ -130,6 +186,7 @@ private struct CreateClubView: View {
                 footer: { Text("You’ll be the first organizer. You can set your club’s logo, colors, and description next.") }
                 if let problem { Text(problem).foregroundStyle(.red) }
             }
+            .brandListBackground()
             .navigationTitle("Create a club")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -153,9 +210,52 @@ private struct CurrentClubView: View {
     @Environment(ClubStore.self) private var store
     @State private var editing = false
     @State private var steppingDown = false
+    @State private var creatingEvent = false
+    var onShowEvents: () -> Void
+    var openEvent: (String) -> Void
+
     var body: some View {
-        List {
+        TimelineView(.periodic(from: .now, by: 60)) { clock in
+            clubPage(at: clock.date)
+        }
+        .navigationTitle(store.club.name).navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if store.isAdmin {
+                ToolbarItem(placement: .primaryAction) { Button("Edit") { editing = true }.accessibilityLabel("Edit club") }
+            }
+        }
+        .sheet(isPresented: $editing) { ClubEditor(club: store.club) }
+        .sheet(isPresented: $steppingDown) { StepDownView() }
+        .sheet(isPresented: $creatingEvent) { EventEditorView(event: nil, onSave: openEvent) }
+    }
+
+    private func clubPage(at now: Date) -> some View {
+        let upcoming = store.upcomingEvents(at: now)
+        return List {
             Section { ClubIdentity(club: store.club) }.listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
+            Section("Upcoming events") {
+                if upcoming.isEmpty {
+                    Text("No upcoming events")
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("club-events-empty")
+                } else {
+                    ForEach(upcoming.prefix(3)) { event in
+                        NavigationLink(value: ClubRoute.event(club: store.club.id, event: event.id)) {
+                            ClubEventRow(event: event)
+                        }
+                        .accessibilityIdentifier("club-event-" + event.id)
+                    }
+                    if upcoming.count > 3 {
+                        Button("See all upcoming events", action: onShowEvents)
+                            .accessibilityIdentifier("club-all-upcoming")
+                    }
+                }
+                if store.isAdmin {
+                    Button { creatingEvent = true } label: { Label("Create event", systemImage: "calendar.badge.plus") }
+                        .accessibilityIdentifier("club-create-event")
+                }
+            }
+
             if store.hasOrganizerRole {
                 Section {
                     Toggle("View as a member", isOn: Binding(get: { store.viewingAsMember }, set: { store.setMemberView($0) }))
@@ -173,21 +273,35 @@ private struct CurrentClubView: View {
                 LabeledContent("Alumni", value: String(store.members.filter { $0.effectiveKind() == .alumni }.count))
                 if !store.isPreview || store.club.id == "menasa" {
                     ShareLink(item: store.inviteURL, subject: Text("Join " + store.club.name), message: Text("Meet us on Club Connect.")) {
-                    Label("Invite a friend", systemImage: "person.badge.plus")
+                        Label("Invite a friend", systemImage: "person.badge.plus")
                     }.accessibilityIdentifier("share-club-invite")
                 }
             }
-
         }
-        .navigationTitle(store.club.name).navigationBarTitleDisplayMode(.inline)
+        .brandListBackground()
         .refreshable { await store.refresh() }
-        .toolbar {
-            if store.isAdmin {
-                ToolbarItem(placement: .primaryAction) { Button("Edit") { editing = true }.accessibilityLabel("Edit club") }
+    }
+}
+
+private struct ClubEventRow: View {
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.brandTheme) private var theme
+    let event: ClubEvent
+
+    var body: some View {
+        HStack(spacing: 12) {
+            if !typeSize.isAccessibilitySize {
+                EventDateTile(date: event.startsAt)
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(event.title).font(.headline).foregroundStyle(theme.ink)
+                Text(event.location).font(.subheadline).foregroundStyle(theme.ink.opacity(0.76))
+                Text(event.startsAt.formatted(date: typeSize.isAccessibilitySize ? .abbreviated : .omitted, time: .shortened))
+                    .font(.caption).foregroundStyle(theme.ink.opacity(0.76))
             }
         }
-        .sheet(isPresented: $editing) { ClubEditor(club: store.club) }
-        .sheet(isPresented: $steppingDown) { StepDownView() }
+        .frame(minHeight: 44)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -210,6 +324,7 @@ private struct StepDownView: View {
                 if let problem { Text(problem).foregroundStyle(.red) }
                 Button("Step down", role: .destructive) { confirming = true }.disabled(saving)
             }
+            .brandListBackground()
             .navigationTitle("Organizer handoff").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.disabled(saving) } }
             .confirmationDialog("Give up your organizer role in " + store.club.name + "?", isPresented: $confirming, titleVisibility: .visible) {
@@ -227,17 +342,40 @@ private struct StepDownView: View {
     }
 }
 
+struct ClubBadge: View {
+    let club: Club
+    let side: CGFloat
+
+    var body: some View {
+        ZStack {
+            if let bytes = club.logoData, let image = UIImage(data: bytes) {
+                Color.white
+                Image(uiImage: image).resizable().scaledToFit().padding(side * 0.08)
+            } else {
+                club.brandColor
+                let words = club.name.split(whereSeparator: \.isWhitespace)
+                Text(words.prefix(2).compactMap(\.first).map(String.init).joined().uppercased())
+                    .font(.system(size: side * 0.42, weight: .semibold, design: .serif))
+                    .foregroundStyle(BrandTheme.label(on: club.brandColor))
+            }
+        }
+        .frame(width: side, height: side)
+        .clipShape(.rect(cornerRadius: side * 0.24))
+        .accessibilityHidden(true)
+    }
+}
+
 private struct ClubIdentity: View {
+    @Environment(\.brandTheme) private var theme
     let club: Club
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
-            CommunityMark(logoData: club.logoData, side: 60)
-                .padding(8)
-                .background(Color.white, in: RoundedRectangle(cornerRadius: 17))
+            ClubBadge(club: club, side: 64)
             VStack(alignment: .leading, spacing: 4) {
                 Text(club.name)
                     .font(.system(.largeTitle, design: .serif, weight: .semibold))
+                    .foregroundStyle(theme.ink)
                     .accessibilityAddTraits(.isHeader)
                 if !club.fullName.isEmpty && club.name != club.fullName {
                     Text(club.fullName)
@@ -299,7 +437,7 @@ private struct ClubEditor: View {
             Form {
                 Section("Identity") {
                     AdaptivePhotoRow {
-                        CommunityMark(logoData: draft.logoData, side: 60)
+                        ClubBadge(club: draft, side: 60)
                         CommunityPhotoPicker(label: "Choose logo", removalLabel: "Remove logo", data: $draft.logoData, isLoading: $loadingImage, preservesTransparency: true)
                     }
                     .padding(.vertical, 4)
@@ -313,7 +451,7 @@ private struct ClubEditor: View {
                 }
                 Section("Club palette") {
                     palettePicker("Primary color", hex: draft.accentHex, color: draft.brandColor) { draft.accentHex = $0 }
-                    palettePicker("Secondary color", hex: draft.secondaryHex ?? Club.defaultSecondaryHex, color: draft.secondaryBrandColor) { draft.secondaryHex = $0 }
+                    palettePicker("Secondary color", hex: draft.effectiveSecondaryHex, color: draft.secondaryBrandColor) { draft.secondaryHex = $0 }
                 }
                 Section("About the club") {
                     TextField("Describe your club", text: $draft.about, axis: .vertical)
@@ -324,6 +462,7 @@ private struct ClubEditor: View {
                         .listRowInsets(EdgeInsets())
                 }
             }
+            .brandListBackground()
             .navigationTitle("Edit club")
             .navigationBarTitleDisplayMode(.inline)
             .disabled(saving)

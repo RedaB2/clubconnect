@@ -2,8 +2,8 @@ import SwiftUI
 
 struct EventDetailView: View {
     @Environment(ClubStore.self) private var store
+    @Environment(\.brandTheme) private var theme
     @Environment(\.dynamicTypeSize) private var typeSize
-    @Environment(\.self) private var environment
     @State private var sheet: EventSheet?
     @State private var reserving = false
     @State private var errorText: String?
@@ -66,7 +66,7 @@ struct EventDetailView: View {
             VStack(alignment: .leading, spacing: 24) {
                 if !typeSize.isAccessibilitySize, let artwork = event.bundledArtwork {
                     Rectangle()
-                        .fill(store.club.accent.opacity(0.2))
+                        .fill(theme.wash)
                         .frame(height: 178)
                         .overlay { Image(artwork).resizable().scaledToFill() }
                         .clipShape(RoundedRectangle(cornerRadius: 20))
@@ -75,8 +75,9 @@ struct EventDetailView: View {
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text([store.club.name, event.category].filter { !$0.isEmpty }.joined(separator: "  ·  ").uppercased())
-                        .font(.caption.weight(.bold)).tracking(1.1).foregroundStyle(Color.primary.opacity(0.68))
+                        .font(.caption.weight(.bold)).tracking(1.1).foregroundStyle(theme.accent)
                     Text(event.title)
+                        .foregroundStyle(theme.ink)
                         .font(.system(.largeTitle, design: .serif, weight: .semibold))
                         .accessibilityAddTraits(.isHeader)
                 }
@@ -92,20 +93,20 @@ struct EventDetailView: View {
                                 .font(.headline)
                             Text(event.timeRange).font(.subheadline).foregroundStyle(Color.primary.opacity(0.68))
                         }
-                    } icon: { Image(systemName: "calendar").foregroundStyle(store.club.accent) }
+                    } icon: { Image(systemName: "calendar").foregroundStyle(theme.accent) }
                     Divider()
                     Label {
                         Text(event.location).font(.headline)
-                    } icon: { Image(systemName: "mappin.and.ellipse").foregroundStyle(store.club.accent) }
+                    } icon: { Image(systemName: "mappin.and.ellipse").foregroundStyle(theme.accent) }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(16)
-                .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 17))
+                .background(theme.surface, in: RoundedRectangle(cornerRadius: 17))
                 Button { sheet = .calendar } label: {
                     Label("Add to Calendar", systemImage: "calendar.badge.plus")
                 }
                 .buttonStyle(.bordered)
-                .tint(Color.primary)
+                .tint(theme.ink)
                 if !event.summary.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("About this event").font(.title3.bold()).accessibilityAddTraits(.isHeader)
@@ -117,7 +118,7 @@ struct EventDetailView: View {
             .frame(maxWidth: 700)
             .frame(maxWidth: .infinity)
         }
-        .background(Color(uiColor: .systemGroupedBackground))
+        .background(theme.canvas)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if !typeSize.isAccessibilitySize, hasTicket(for: event) || event.endsAt > .now {
                 ticketAction(event)
@@ -134,12 +135,7 @@ struct EventDetailView: View {
         store.tickets.contains { $0.eventID == event.id }
     }
 
-    private var ticketLabelColor: Color {
-        let background = store.club.accent.resolve(in: environment)
-        // Black and white have equal WCAG contrast at a relative luminance of about 0.179.
-        let luminance = 0.2126 * background.linearRed + 0.7152 * background.linearGreen + 0.0722 * background.linearBlue
-        return luminance > 0.179 ? .black : .white
-    }
+    private var ticketLabelColor: Color { BrandTheme.label(on: theme.accent) }
 
     private func ticketAction(_ event: ClubEvent) -> some View {
         Group {

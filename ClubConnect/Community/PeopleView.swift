@@ -64,6 +64,7 @@ struct PeopleView: View {
                 }
             }
             .listStyle(.plain)
+            .brandListBackground()
             .refreshable { await store.refresh() }
             .navigationTitle("People")
             .toolbar { ToolbarItem(placement: .topBarLeading) { ActiveClubMenu() } }

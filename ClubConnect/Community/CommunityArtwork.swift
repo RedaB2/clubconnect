@@ -4,6 +4,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct MemberPortrait: View {
+    @Environment(\.brandTheme) private var theme
     let name: String
     let imageData: Data?
     let diameter: CGFloat
@@ -15,25 +16,13 @@ struct MemberPortrait: View {
         return (first + last).uppercased()
     }
 
-    private var ink: Color {
-        let swatches = [
-            Color(red: 0.60, green: 0.32, blue: 0.23),
-            Color(red: 0.29, green: 0.44, blue: 0.39),
-            Color(red: 0.37, green: 0.38, blue: 0.53),
-            Color(red: 0.53, green: 0.38, blue: 0.22),
-            Color(red: 0.46, green: 0.32, blue: 0.41)
-        ]
-        let index = name.utf8.reduce(0) { ($0 + Int($1)) % swatches.count }
-        return swatches[index]
-    }
-
     var body: some View {
         Group {
             if let imageData, let image = UIImage(data: imageData) {
                 Image(uiImage: image).resizable().scaledToFill()
             } else {
                 ZStack {
-                    Circle().fill(ink.opacity(0.17))
+                    Circle().fill(theme.wash)
                     if initials.isEmpty {
                         Image(systemName: "person.fill")
                             .font(.system(size: diameter * 0.38))
@@ -42,7 +31,7 @@ struct MemberPortrait: View {
                             .font(.system(size: diameter * 0.39, weight: .medium, design: .serif))
                     }
                 }
-                .foregroundStyle(.primary)
+                .foregroundStyle(theme.ink)
             }
         }
         .frame(width: diameter, height: diameter)

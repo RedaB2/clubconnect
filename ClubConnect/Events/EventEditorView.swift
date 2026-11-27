@@ -54,6 +54,7 @@ struct EventEditorView: View {
                 }
             }
             .disabled(saving)
+            .brandListBackground()
             .navigationTitle(isNew ? "New event" : "Edit event")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

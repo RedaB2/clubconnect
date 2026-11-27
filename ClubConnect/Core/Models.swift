@@ -1,5 +1,4 @@
 import Foundation
-import SwiftUI
 
 struct Club: Codable, Hashable, Identifiable {
     var id: String
@@ -7,45 +6,11 @@ struct Club: Codable, Hashable, Identifiable {
     var fullName: String
     var about: String
     var accentHex: String
-    static let defaultSecondaryHex = "#31675D"
+    static let defaultPrimaryHex = "#80523F"
+    static let defaultSecondaryHex = "#F0E4D9"
     // Older on-device sample snapshots predate the second palette color.
     var secondaryHex: String?
     var logoData: Data? = nil
-
-    private func rgb(_ hex: String) -> [Double] {
-        let value = Int(hex.trimmingCharacters(in: CharacterSet(charactersIn: "#")), radix: 16) ?? 0x974A30
-        return [16, 8, 0].map { Double((value >> $0) & 255) / 255 }
-    }
-
-    private func color(_ hex: String) -> Color {
-        let channels = rgb(hex)
-        return Color(red: channels[0], green: channels[1], blue: channels[2])
-    }
-
-    var brandColor: Color { color(accentHex) }
-    var secondaryBrandColor: Color { color(secondaryHex ?? Self.defaultSecondaryHex) }
-
-    var accent: Color {
-        let channels = rgb(accentHex)
-        return Color(uiColor: UIColor { traits in
-            let dark = traits.userInterfaceStyle == .dark
-            let backgroundLuminance = dark ? 0.026 : 0.91
-            let required = traits.accessibilityContrast == .high ? 7.0 : 4.5
-            var mix = 0.0
-            var adjusted = channels
-            // Keep the original hue, darkening or lightening only when the club
-            // color needs more contrast against system grouped backgrounds.
-            while mix < 1 {
-                let linear = adjusted.map { $0 <= 0.04045 ? $0 / 12.92 : pow(($0 + 0.055) / 1.055, 2.4) }
-                let ink = linear[0]*0.2126 + linear[1]*0.7152 + linear[2]*0.0722
-                let ratio = (max(ink, backgroundLuminance) + 0.05) / (min(ink, backgroundLuminance) + 0.05)
-                if ratio >= required { break }
-                mix = min(1, mix + 0.02)
-                adjusted = channels.map { $0 * (1 - mix) + (dark ? mix : 0) }
-            }
-            return UIColor(red: adjusted[0], green: adjusted[1], blue: adjusted[2], alpha: 1)
-        })
-    }
 }
 
 enum MemberKind: String, CaseIterable, Codable, Hashable {
@@ -139,7 +104,7 @@ struct CommunityState: Codable {
     static let pilot = Club(id: "menasa", name: "MENASA",
         fullName: "Middle Eastern and North African Association",
         about: "A campus community for Middle Eastern and North African students, alumni, and friends. Pull up a chair for coffee, conversation, and a little taste of home.",
-        accentHex: "#974A30")
+        accentHex: "#974A30", secondaryHex: "#31675D")
 
     static func sample(now: Date = .now) -> Self {
         let campusYear = GraduationTerm.campusCalendar.component(.year, from: now)

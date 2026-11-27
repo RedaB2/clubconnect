@@ -19,6 +19,8 @@ begin
     perform set_config('request.jwt.claims', jsonb_build_object('sub',a,'role','authenticated')::text, true);
     p := jsonb_build_object('name','Campus Member','graduationTerm','fall','graduationYear',extract(year from now())::integer + 2,'classStanding','junior');
     s := public.create_campus_club(campus,'Club A',p);
+    assert s->'club'->>'accentHex'='#80523F' and s->'club'->>'secondaryHex'='#F0E4D9',
+        'New clubs start with the Club Connect palette';
     assert (s->>'isAdmin')::boolean and s->'members'->0->>'name'='Campus Member';
     assert jsonb_array_length(s->'members')=1;
     s := public.create_campus_club(campus,'Club A',p);

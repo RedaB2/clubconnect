@@ -85,8 +85,9 @@ final class PilotFlowTests: XCTestCase {
         let year = app.textFields["graduation-year-input"]
         if !year.exists { app.swipeUp() }
         XCTAssertTrue(year.waitForExistence(timeout: 5), app.debugDescription)
-        year.tap()
-        year.typeKey("a", modifierFlags: .command)
+        let existingYear = try XCTUnwrap(year.value as? String)
+        year.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.5)).tap()
+        year.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: existingYear.count))
         year.typeText("2004")
         XCTAssertEqual(year.value as? String, "2004")
         app.buttons["Save"].tap()
