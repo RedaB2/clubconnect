@@ -1,0 +1,9 @@
+project_id = "clubconnect"
+
+[functions.event-pass]
+verify_jwt = false
+
+# Apple signs native identity tokens for this iOS bundle ID.
+[auth.external.apple]
+enabled = true
+client_id = "com.redaboutayeb.clubconnect"

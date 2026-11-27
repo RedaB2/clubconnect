@@ -1,0 +1,5 @@
+{
+  "imports": {
+    "passkit-generator": "npm:passkit-generator@3.7.0"
+  }
+}
