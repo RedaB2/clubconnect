@@ -14,6 +14,7 @@ declare
     event_data jsonb;
     profile_data jsonb := '{
         "name":"Pilot student", "kind":"alumni", "major":"Architecture",
+        "graduationTerm":"fall", "graduationYear":2020,
         "interests":["Film","Design"], "experience":"Event planning", "bio":"Pilot fixture", "photoData":"AQID"
     }';
     club_data jsonb := '{
@@ -27,15 +28,22 @@ declare
 begin
     -- Creation of disposable test identities and a private club is the only
     -- privileged setup. All subsequent actions use the authenticated RPC role.
-    insert into auth.users (id) values (organizer), (student);
+    insert into auth.users (id, email, email_confirmed_at, raw_app_meta_data) values
+        (organizer, organizer || '@usc.edu', now(), '{"provider":"email"}'),
+        (student, student || '@usc.edu', now(), '{"provider":"email"}');
     insert into club_private.clubs (id, name, "fullName", about, "accentHex")
         values (club, 'Pilot', 'Pilot fixture', '', '#554433');
     insert into club_private.organizer_invites (club_id, digest)
         values (club, sha256(convert_to(invitation, 'UTF8')));
 
+    assert club_private.graduation_kind('spring', 2027, date '2027-05-31') = 'student';
+    assert club_private.graduation_kind('spring', 2027, date '2027-06-01') = 'alumni';
+    assert club_private.graduation_kind('fall', 2027, date '2027-12-31') = 'student';
+    assert club_private.graduation_kind('fall', 2027, date '2028-01-01') = 'alumni';
+
     set local role authenticated;
     perform set_config('request.jwt.claims', jsonb_build_object('sub', organizer, 'role', 'authenticated')::text, true);
-    state := public.join_club('Pilot organizer', club);
+    state := public.enroll_student(club, 'Pilot organizer', 'spring', extract(year from now())::int + 1, 'senior');
     assert state->>'myID' = organizer::text and state->'isAdmin' = 'false'::jsonb, 'Enrollment starts as an ordinary member';
     state := public.claim_organizer(invitation, club);
     assert state->'isAdmin' = 'true'::jsonb, 'Organizer invitation grants organizer access';
@@ -52,7 +60,12 @@ begin
     organizer_ticket := state->'tickets'->0;
 
     perform set_config('request.jwt.claims', jsonb_build_object('sub', student, 'role', 'authenticated')::text, true);
-    state := public.join_club('Fixture student', club);
+    begin
+        perform public.enroll_student(club, 'Fixture student', 'spring', extract(year from now())::int + 1, null);
+        raise exception 'A current student enrolled without choosing a standing' using errcode='XX000';
+    exception when invalid_parameter_value then null;
+    end;
+    state := public.enroll_student(club, 'Fixture student', 'spring', extract(year from now())::int + 1, 'junior');
     assert state->'tickets' = '[]'::jsonb, 'A new member has no tickets from other members';
     assert (state->'club') @> club_data, 'Club settings and logo persist for another member';
     begin
@@ -110,7 +123,7 @@ begin
     begin
         perform public.snapshot(club);
         raise exception 'Deleted member retained access' using errcode = 'XX000';
-    exception when insufficient_privilege then null;
+    exception when invalid_authorization_specification then null;
     end;
 
     perform set_config('request.jwt.claims', jsonb_build_object('sub', organizer, 'role', 'authenticated')::text, true);

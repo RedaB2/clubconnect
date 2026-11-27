@@ -3,7 +3,19 @@ project_id = "clubconnect"
 [functions.event-pass]
 verify_jwt = false
 
-# Apple signs native identity tokens for this iOS bundle ID.
-[auth.external.apple]
+[auth]
+additional_redirect_urls = ["clubconnect://auth/callback"]
+enable_anonymous_sign_ins = false
+
+[auth.email]
 enabled = true
-client_id = "com.redaboutayeb.clubconnect"
+enable_confirmations = true
+otp_length = 6
+otp_expiry = 600
+
+[auth.hook.before_user_created]
+enabled = true
+uri = "pg-functions://postgres/public/before_usc_signup"
+
+[auth.external.apple]
+enabled = false
