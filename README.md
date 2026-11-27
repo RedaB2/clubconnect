@@ -2,19 +2,28 @@
 
 A native iPhone and iPad community app for USC students and alumni. MENASA is the pilot club. One verified USC account can join several clubs and organize any clubs it creates.
 
-<img src="media/events-iphone.jpg" alt="The Events tab on iPhone" width="235"> <img src="media/events-ipad.jpg" alt="Events in an adaptive split view on iPad" width="395">
+<img src="media/campus-clubs-iphone.jpg" alt="Campus club directory in the Club Connect palette" width="235"> <img src="media/club-page-iphone.jpg" alt="MENASA’s club page with upcoming events in its own colors" width="235">
 
 ## Using the pilot
 
 1. Enter an address ending in **@usc.edu**. Open the verification link on the device that started sign-in, or enter the email’s six-digit code in the app. Both expire after ten minutes.
 2. Choose a first club or create one, then enter a name, graduation term, and year. Current students also choose freshman, sophomore, junior, senior, or graduate student. A spring graduate becomes an alum on June 1 and a fall graduate on January 1 of the following year, in Los Angeles time.
-3. Use **Clubs** to find, join, or create clubs. The club menu in Events, People, and Messages switches the active community. Editing a personal profile updates it across memberships.
-4. Organizers can change their club’s name, description, logo, and two colors. **View as a member** hides management tools for that club. **Step down as organizer** gives up the role. A sole organizer chooses a successor before stepping down. MENASA’s initial organizer can redeem the private invitation in Profile.
+3. Use **Clubs** to find, join, or create clubs. Open a club to see its next three events. Tap a date to open the event, or **See all upcoming events** for a longer calendar. The club menu in Events, People, and Messages switches the active community.
+4. The campus directory, account screens, and personal profile use Club Connect’s ivory, white, and brown palette. Each club’s page, event details, member directory, and conversations use its own colors. Organizers can change the logo and both colors in **Edit club**. **View as a member** hides management tools. **Step down as organizer** gives up the role. A sole organizer chooses a successor before stepping down. MENASA’s initial organizer can redeem the private invitation in Profile.
 5. Open another member’s profile in People and tap **Message**, or start a conversation in **Messages**. Conversations belong to a club and only the participants can read them.
 6. RSVP to an event and open **View ticket**. On a compatible iPhone, **Add to Apple Wallet** installs a signed pass with the same code used at check-in. The Calendar editor, share sheet, and manual or camera-assisted check-in use native iOS controls.
 7. Verified members can open the fictional sample community from Clubs. Debug builds also offer a local preview from the welcome screen. Network features that issue Wallet passes require a verified account.
 
 <img src="media/profile-iphone.jpg" alt="A centered member profile with class standing and graduation term" width="235"> <img src="media/sample-wallet-pass.jpg" alt="A signed sample event ticket installed in Apple Wallet" width="235">
+
+### Test Apple Wallet on iPhone
+
+1. Sign in with a verified USC email and complete your profile. Open **Clubs → Explore the sample community** and choose **MENASA**.
+2. Open an upcoming event, such as **Coffee at the Majlis**, and tap **RSVP**. If you already have a reservation, tap **View ticket**.
+3. Tap **Add to Apple Wallet**, then **Add** in Apple's sheet. Open Wallet and look for the sample pass. Adding a pass requires a network connection and a compatible iPhone.
+4. To try check-in on that same phone, copy the code from the sample ticket. Open the event’s **Manage event → Check in members**, paste the code, and tap **Check in member**. The ticket will show **Checked in**. For a live event, an organizer can scan the attendee’s Wallet QR from a second device.
+
+<img src="media/events-iphone.jpg" alt="The Events tab on iPhone" width="235"> <img src="media/events-ipad.jpg" alt="Events in an adaptive split view on iPad" width="395">
 
 ## Running and testing
 
