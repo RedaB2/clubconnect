@@ -19,3 +19,11 @@ uri = "pg-functions://postgres/public/before_usc_signup"
 
 [auth.external.apple]
 enabled = false
+
+[auth.email.template.confirmation]
+subject = "Verify your USC email for Club Connect"
+content_path = "./supabase/templates/sign-in.html"
+
+[auth.email.template.magic_link]
+subject = "Your Club Connect sign-in link and code"
+content_path = "./supabase/templates/sign-in.html"

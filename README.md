@@ -6,7 +6,7 @@ A native iPhone and iPad community app for USC students and alumni. MENASA is th
 
 ## Using the pilot
 
-1. Enter an address ending in **@usc.edu**. Open the verification link on the device that started sign-in. If the sender includes a six-digit code, it can also be entered in the app.
+1. Enter an address ending in **@usc.edu**. Open the verification link on the device that started sign-in, or enter the email’s six-digit code in the app. Both expire after ten minutes.
 2. Choose a first club or create one, then enter a name, graduation term, and year. Current students also choose freshman, sophomore, junior, senior, or graduate student. A spring graduate becomes an alum on June 1 and a fall graduate on January 1 of the following year, in Los Angeles time.
 3. Use **Clubs** to find, join, or create clubs. The club menu in Events, People, and Messages switches the active community. Editing a personal profile updates it across memberships.
 4. Organizers can change their club’s name, description, logo, and two colors. **View as a member** hides management tools for that club. **Step down as organizer** gives up the role. A sole organizer chooses a successor before stepping down. MENASA’s initial organizer can redeem the private invitation in Profile.
@@ -28,7 +28,7 @@ The hosted Supabase project runs email authentication, member-scoped PostgreSQL 
 
 When a message is sent or read, Supabase Realtime signals the participants’ open inboxes. Each device retrieves new messages through the authenticated conversation API. The app also catches up after reconnecting.
 
-**Verification email delivery requires a transactional sender.** Supabase’s default sender only delivers to project-team addresses. Configure the authorized From address and SMTP credentials in [Club Connect Auth settings](https://supabase.com/dashboard/project/kdbuclwxzgndhpukxwrn/auth/smtp). Keep credentials out of Git. The mobile flow supports PKCE verification links and the optional Supabase email template token `{{ .Token }}`. [Supabase SMTP documentation](https://supabase.com/docs/guides/auth/auth-smtp)
+Supabase sends verification emails through Resend as **Club Connect** (`clubconnect@mail.worldniche.app`). Its dedicated sending key is restricted to that domain and stored in the hosted project’s [Auth settings](https://supabase.com/dashboard/project/kdbuclwxzgndhpukxwrn/auth/smtp). The [email template](supabase/templates/sign-in.html) includes a same-device sign-in link and a six-digit code for first-time and returning members.
 
 Versioned schema changes live in `supabase/migrations/`. The scripts in `supabase/tests/` run against a migrated database with an administrative PostgreSQL connection. They roll back their synthetic users, clubs, messages, and tickets.
 
