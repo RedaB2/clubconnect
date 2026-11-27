@@ -1,0 +1,14 @@
+.DS_Store
+xcuserdata/
+DerivedData/
+build/
+*.xcarchive
+*.ipa
+*.p8
+*.p12
+*.mobileprovision
+.env
+.env.*
+!.env.example
+supabase/.temp/
+supabase/.branches/
