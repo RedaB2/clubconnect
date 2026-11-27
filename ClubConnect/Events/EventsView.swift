@@ -77,6 +77,7 @@ struct EventsView: View {
         .background(Color(uiColor: .systemGroupedBackground))
         .refreshable { await store.refresh() }
         .navigationTitle("Events")
+            .toolbar { ToolbarItem(placement: .topBarLeading) { ActiveClubMenu() } }
         .toolbar {
             if store.isAdmin {
                 ToolbarItem(placement: createPlacement) {

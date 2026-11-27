@@ -11,8 +11,13 @@ struct MyProfileView: View {
     var body: some View {
         NavigationStack {
             MemberProfile(member: store.me) {
+                if !store.me.hasCompleteAcademicProfile() {
+                    Section {
+                        Button("Complete graduation details") { editing = true }
+                    }
+                }
                 Section {
-                    if !store.isPreview && !store.isAdmin {
+                    if !store.isPreview && !store.hasOrganizerRole {
                         Button { redeeming = true } label: {
                             Label("Redeem organizer invitation", systemImage: "envelope.badge.person.crop")
                         }
@@ -20,7 +25,7 @@ struct MyProfileView: View {
                     Button {
                         perform { try await store.leaveSession() }
                     } label: {
-                        Label(store.isPreview ? "Leave sample community" : "Sign out", systemImage: "rectangle.portrait.and.arrow.right")
+                        Label(store.isPreview ? (store.hasCampusSession ? "Return to my clubs" : "Leave sample community") : "Sign out", systemImage: "rectangle.portrait.and.arrow.right")
                     }
                     if !store.isPreview {
                         Button("Delete account", role: .destructive) { confirmingDeletion = true }
@@ -119,24 +124,33 @@ struct MemberProfile<Footer: View>: View {
     var body: some View {
         List {
             Section {
-                VStack(alignment: .leading, spacing: 14) {
+                VStack(spacing: 14) {
                     MemberPortrait(name: member.name, imageData: member.photoData, diameter: 85)
-                    VStack(alignment: .leading, spacing: 5) {
+                    VStack(spacing: 5) {
                         Text(member.name)
                             .font(.system(.largeTitle, design: .serif, weight: .medium))
                             .accessibilityAddTraits(.isHeader)
-                        Text(member.kind.communityTitle)
+                        Text(member.effectiveKind()?.communityTitle ?? "Graduation term needed")
                             .font(.subheadline.weight(.medium))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.primary.opacity(0.72))
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
                 .padding(.vertical, 4)
             }
             .listRowBackground(Color.clear)
             .listRowInsets(.init(top: 4, leading: 0, bottom: 6, trailing: 0))
             if !member.bio.isEmpty {
                 Section("About") { Text(member.bio).textSelection(.enabled) }
+            }
+            if let graduation = member.graduationLabel {
+                Section("Education") {
+                    LabeledContent("Graduation", value: graduation)
+                    if member.effectiveKind() == .student, let standing = member.classStanding {
+                        LabeledContent("Class standing", value: standing.title)
+                    }
+                }
             }
             if !member.major.isEmpty {
                 Section("Major") { Label(member.major, systemImage: "graduationcap").labelStyle(CommunityFieldLabelStyle()) }
@@ -196,14 +210,11 @@ private struct ProfileEditor: View {
                 }
                 Section("Profile") {
                     TextField("Name", text: $draft.name).textContentType(.name)
-                    Picker("Membership", selection: $draft.kind) {
-                        Text("Student").tag(MemberKind.student)
-                        Text("Alumni").tag(MemberKind.alumni)
-                    }
                     TextField("Major", text: $draft.major)
                     TextField("About you", text: $draft.bio, axis: .vertical)
                         .lineLimit(2...6)
                 }
+                GraduationFields(term: $draft.graduationTerm, year: $draft.graduationYear, standing: $draft.classStanding)
                 Section {
                     TextField("Interests", text: $interests, axis: .vertical)
                         .lineLimit(1...4)
@@ -222,7 +233,8 @@ private struct ProfileEditor: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.disabled(saving) }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }
-                        .disabled(saving || loadingImage || draft.name.communityTrimmed.isEmpty)
+                        .disabled(saving || loadingImage || draft.name.communityTrimmed.isEmpty ||
+                                  !draft.hasCompleteAcademicProfile() || !GraduationTerm.validYears.contains(draft.graduationYear ?? 0))
                 }
             }
             .interactiveDismissDisabled(saving)
@@ -233,8 +245,11 @@ private struct ProfileEditor: View {
     }
 
     private func save() {
-        guard !saving else { return }
+        guard !saving, let kind = draft.effectiveKind(), draft.hasCompleteAcademicProfile(),
+              GraduationTerm.validYears.contains(draft.graduationYear ?? 0) else { return }
         var update = draft
+        update.kind = kind
+        if kind == .alumni { update.classStanding = nil }
         update.name = draft.name.communityTrimmed
         update.major = draft.major.communityTrimmed
         update.bio = draft.bio.communityTrimmed
@@ -250,6 +265,54 @@ private struct ProfileEditor: View {
                 dismiss()
             } catch { problem = error.localizedDescription }
             saving = false
+        }
+    }
+}
+
+struct GraduationFields: View {
+    @Binding var term: GraduationTerm?
+    @Binding var year: Int?
+    @Binding var standing: ClassStanding?
+
+    private var kind: MemberKind? {
+        guard let term, let year, GraduationTerm.validYears.contains(year) else { return nil }
+        return term.kind(year: year)
+    }
+
+    var body: some View {
+        Section {
+            Picker("Graduation term", selection: $term) {
+                Text("Choose term").tag(nil as GraduationTerm?)
+                ForEach(GraduationTerm.allCases, id: \.self) { term in
+                    Text(term.title).tag(Optional(term))
+                }
+            }
+            LabeledContent("Graduation year") {
+                TextField("YYYY", value: $year, format: .number.grouping(.never))
+                    .keyboardType(.numberPad)
+                    .multilineTextAlignment(.trailing)
+                    .accessibilityLabel("Graduation year")
+                    .accessibilityIdentifier("graduation-year-input")
+            }
+            if let kind {
+                LabeledContent("Membership", value: kind.communityTitle)
+                if kind == .student {
+                    Picker("Class standing", selection: $standing) {
+                        Text("Choose standing").tag(nil as ClassStanding?)
+                        ForEach(ClassStanding.allCases, id: \.self) { standing in
+                            Text(standing.title).tag(Optional(standing))
+                        }
+                    }
+                }
+            }
+        } header: {
+            Text("Graduation")
+        } footer: {
+            if let year, !GraduationTerm.validYears.contains(year) {
+                Text("Enter a year from \(GraduationTerm.validYears.lowerBound.formatted(.number.grouping(.never))) through \(GraduationTerm.validYears.upperBound.formatted(.number.grouping(.never))).")
+            } else {
+                Text(GraduationTerm.cutoffDescription)
+            }
         }
     }
 }

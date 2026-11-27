@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		B8330729EE2D7582F0E69844 /* Realtime in Frameworks */ = {isa = PBXBuildFile; productRef = B2BE2BA268E17375159B3358 /* Realtime */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		310D29F68BC6313DEFED9D31 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -41,6 +45,17 @@
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		98E5812C9895C7728B3640EF /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B8330729EE2D7582F0E69844 /* Realtime in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		2DF8A7E816C66213FE69BEE8 = {
@@ -92,6 +107,7 @@
 			buildPhases = (
 				C7687CA1CC57D9518D5ACE50 /* Sources */,
 				625A8EDDE60911D23EDCDD54 /* Resources */,
+				98E5812C9895C7728B3640EF /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -102,6 +118,7 @@
 			);
 			name = ClubConnect;
 			packageProductDependencies = (
+				B2BE2BA268E17375159B3358 /* Realtime */,
 			);
 			productName = ClubConnect;
 			productReference = 9DC9E959BC27F33C1C08BA11 /* ClubConnect.app */;
@@ -134,6 +151,9 @@
 			);
 			mainGroup = 2DF8A7E816C66213FE69BEE8;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				6E0E7C2A7BAD422F5F34ED2D /* XCRemoteSwiftPackageReference "supabase-swift" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 665EDFCD2DF63905BEC9AB05 /* Products */;
 			projectDirPath = "";
@@ -192,7 +212,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = Config/ClubConnect.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -241,7 +260,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = AD6Q827Z79;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -342,7 +361,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = AD6Q827Z79;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -372,7 +391,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = Config/ClubConnect.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -418,6 +436,25 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		6E0E7C2A7BAD422F5F34ED2D /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase/supabase-swift.git";
+			requirement = {
+				kind = exactVersion;
+				version = 2.55.8;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		B2BE2BA268E17375159B3358 /* Realtime */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 6E0E7C2A7BAD422F5F34ED2D /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Realtime;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = FCED8783CE5F27682878D1F1 /* Project object */;
 }

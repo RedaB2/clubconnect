@@ -1,54 +1,227 @@
 import SwiftUI
 
+struct ActiveClubMenu: View {
+    @Environment(ClubStore.self) private var store
+    var body: some View {
+        Menu {
+            ForEach(store.catalog.filter(\.joined)) { entry in
+                Button {
+                    Task { do { try await store.selectClub(entry.id) } catch { store.notice = error.localizedDescription } }
+                } label: {
+                    if entry.id == store.club.id { Label(entry.club.name, systemImage: "checkmark") }
+                    else { Text(entry.club.name) }
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Text(store.club.name).lineLimit(1)
+                Image(systemName: "chevron.down").font(.caption2)
+            }.frame(maxWidth: 150)
+        }
+        .accessibilityLabel("Switch club, " + store.club.name)
+    }
+}
+
 struct ClubView: View {
     @Environment(ClubStore.self) private var store
-    @State private var editing = false
+    @State private var query = ""
+    @State private var detail = false
+    @State private var creating = false
+    @State private var joining: ClubListing?
+    @State private var busy = false
 
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    ClubIdentity(club: store.club)
-                }
-                .listRowInsets(EdgeInsets())
-                .listRowBackground(Color.clear)
-                if !store.club.about.isEmpty {
-                    Section("About the club") {
-                        Text(store.club.about)
-                            .padding(.vertical, 4)
-                            .textSelection(.enabled)
+                let matches = store.catalog.filter { query.isEmpty || $0.club.name.localizedStandardContains(query) || $0.club.fullName.localizedStandardContains(query) }
+                Section("My clubs") {
+                    ForEach(matches.filter(\.joined)) { entry in
+                        Button {
+                            perform {
+                                try await store.selectClub(entry.id)
+                                detail = true
+                            }
+                        } label: { clubRow(entry, joined: true) }
+                        .accessibilityIdentifier("select-club-" + entry.id)
                     }
                 }
-                Section("Community") {
-                    LabeledContent {
-                        Text("\(store.members.filter { $0.kind == .student }.count)").monospacedDigit()
-                    } label: {
-                        Label("Students", systemImage: "book")
+                let available = matches.filter { !$0.joined && $0.canJoin }
+                if !available.isEmpty {
+                    Section("Discover clubs") {
+                        ForEach(available) { entry in
+                            Button { joining = entry } label: { clubRow(entry, joined: false) }
+                        }
                     }
-                    LabeledContent {
-                        Text("\(store.members.filter { $0.kind == .alumni }.count)").monospacedDigit()
-                    } label: {
-                        Label("Alumni", systemImage: "graduationcap")
+                }
+                if !store.isPreview {
+                    Section {
+                        Button("Explore the sample community") { store.openSample() }
                     }
-                    ShareLink(item: store.inviteURL, subject: Text("Join \(store.club.name)"), message: Text("Join \(store.club.name) on Club Connect.")) {
-                        Label("Invite a friend", systemImage: "person.badge.plus")
-                    }
-                    .accessibilityIdentifier("share-club-invite")
                 }
             }
-            .listStyle(.insetGrouped)
+            .disabled(busy)
+            .navigationTitle("Clubs")
+            .searchable(text: $query, prompt: "Find a club")
             .refreshable { await store.refresh() }
-            .navigationTitle("Club")
             .toolbar {
-                if store.isAdmin {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("Edit") { editing = true }
-                            .accessibilityLabel("Edit club")
-                    }
+                ToolbarItem(placement: .primaryAction) {
+                    Button { creating = true } label: { Label("Create a club", systemImage: "plus") }
                 }
             }
-            .sheet(isPresented: $editing) {
-                ClubEditor(club: store.club)
+            .navigationDestination(isPresented: $detail) { CurrentClubView() }
+            .sheet(isPresented: $creating) { CreateClubView { detail = true } }
+            .sheet(item: $joining) { entry in
+                NavigationStack {
+                    List {
+                        Section { ClubIdentity(club: entry.club) }.listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
+                        if !entry.club.about.isEmpty { Section("About") { Text(entry.club.about) } }
+                        Button("Join " + entry.club.name) {
+                            perform {
+                                try await store.joinAdditionalClub(entry.id)
+                                joining = nil
+                                detail = true
+                            }
+                        }.disabled(busy)
+                    }
+                    .navigationTitle("Join club").navigationBarTitleDisplayMode(.inline)
+                    .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { joining = nil } } }
+                }
+            }
+        }
+    }
+
+    private func clubRow(_ entry: ClubListing, joined: Bool) -> some View {
+        HStack(spacing: 12) {
+            CommunityMark(logoData: entry.club.logoData, side: 36)
+                .padding(5).background(entry.club.secondaryBrandColor.opacity(0.12), in: .rect(cornerRadius: 12))
+            VStack(alignment: .leading, spacing: 4) {
+                Text(entry.club.name).font(.headline).foregroundStyle(.primary)
+                if joined { Text(entry.isAdmin ? "Organizer" : "Member").font(.subheadline).foregroundStyle(.secondary) }
+                else if entry.club.fullName != entry.club.name { Text(entry.club.fullName).font(.subheadline).foregroundStyle(.secondary) }
+            }
+            Spacer()
+            if entry.id == store.club.id { Image(systemName: "checkmark.circle.fill").accessibilityLabel("Active club") }
+            else { Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary).accessibilityHidden(true) }
+        }.frame(minHeight: 44)
+    }
+
+    private func perform(_ action: @escaping @MainActor () async throws -> Void) {
+        guard !busy else { return }
+        busy = true
+        Task {
+            defer { busy = false }
+            do { try await action() }
+            catch { store.notice = error.localizedDescription }
+        }
+    }
+}
+
+private struct CreateClubView: View {
+    @Environment(ClubStore.self) private var store
+    @Environment(\.dismiss) private var dismiss
+    @State private var name = ""
+    @State private var saving = false
+    @State private var problem: String?
+    var onCreated: () -> Void
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section { TextField("Club name", text: $name).textInputAutocapitalization(.words) }
+                footer: { Text("You’ll be the first organizer. You can set your club’s logo, colors, and description next.") }
+                if let problem { Text(problem).foregroundStyle(.red) }
+            }
+            .navigationTitle("Create a club")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.disabled(saving) }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Create") {
+                        saving = true
+                        Task {
+                            defer { saving = false }
+                            do { try await store.createClub(name: name.communityTrimmed); dismiss(); onCreated() }
+                            catch { problem = error.localizedDescription }
+                        }
+                    }.disabled(saving || !(1...60).contains(name.communityTrimmed.count))
+                }
+            }
+        }.interactiveDismissDisabled(saving)
+    }
+}
+
+private struct CurrentClubView: View {
+    @Environment(ClubStore.self) private var store
+    @State private var editing = false
+    @State private var steppingDown = false
+    var body: some View {
+        List {
+            Section { ClubIdentity(club: store.club) }.listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
+            if store.hasOrganizerRole {
+                Section {
+                    Toggle("View as a member", isOn: Binding(get: { store.viewingAsMember }, set: { store.setMemberView($0) }))
+                        .accessibilityIdentifier("member-view-toggle")
+                    if !store.viewingAsMember {
+                        Button("Step down as organizer") { steppingDown = true }
+                    }
+                } header: { Text("Your role") } footer: {
+                    Text("Member view hides the organizer tools for this club. You can switch back here.")
+                }
+            }
+            if !store.club.about.isEmpty { Section("About the club") { Text(store.club.about).textSelection(.enabled) } }
+            Section("Community") {
+                LabeledContent("Students", value: String(store.members.filter { $0.effectiveKind() == .student }.count))
+                LabeledContent("Alumni", value: String(store.members.filter { $0.effectiveKind() == .alumni }.count))
+                if !store.isPreview || store.club.id == "menasa" {
+                    ShareLink(item: store.inviteURL, subject: Text("Join " + store.club.name), message: Text("Meet us on Club Connect.")) {
+                    Label("Invite a friend", systemImage: "person.badge.plus")
+                    }.accessibilityIdentifier("share-club-invite")
+                }
+            }
+
+        }
+        .navigationTitle(store.club.name).navigationBarTitleDisplayMode(.inline)
+        .refreshable { await store.refresh() }
+        .toolbar {
+            if store.isAdmin {
+                ToolbarItem(placement: .primaryAction) { Button("Edit") { editing = true }.accessibilityLabel("Edit club") }
+            }
+        }
+        .sheet(isPresented: $editing) { ClubEditor(club: store.club) }
+        .sheet(isPresented: $steppingDown) { StepDownView() }
+    }
+}
+
+private struct StepDownView: View {
+    @Environment(ClubStore.self) private var store
+    @Environment(\.dismiss) private var dismiss
+    @State private var successor: String?
+    @State private var confirming = false
+    @State private var saving = false
+    @State private var problem: String?
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Picker("Hand off to", selection: $successor) {
+                        Text("An existing organizer").tag(nil as String?)
+                        ForEach(store.members.filter { $0.id != store.me.id }) { m in Text(m.name).tag(Optional(m.id)) }
+                    }
+                } footer: { Text("You’ll stay a member. If you’re the last organizer, choose another member to take over.") }
+                if let problem { Text(problem).foregroundStyle(.red) }
+                Button("Step down", role: .destructive) { confirming = true }.disabled(saving)
+            }
+            .navigationTitle("Organizer handoff").navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.disabled(saving) } }
+            .confirmationDialog("Give up your organizer role in " + store.club.name + "?", isPresented: $confirming, titleVisibility: .visible) {
+                Button("Step down", role: .destructive) {
+                    saving = true
+                    Task {
+                        defer { saving = false }
+                        do { try await store.stepDown(successor: successor); dismiss() }
+                        catch { problem = error.localizedDescription }
+                    }
+                }
+                Button("Keep role", role: .cancel) {}
             }
         }
     }

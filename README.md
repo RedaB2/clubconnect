@@ -1,26 +1,36 @@
 # Club Connect
 
-Club Connect is a native iPhone and iPad app for the Middle Eastern and North African Association (MENASA). Students and alumni can find each other, share events, RSVP, add events to Calendar, and check in with an in-app ticket or a signed Apple Wallet pass.
+A native iPhone and iPad community app for USC students and alumni. MENASA is the pilot club. One verified USC account can join several clubs and organize any clubs it creates.
 
-<img src="media/events-iphone.jpg" alt="The Events tab on iPhone, with a coffee gathering and two upcoming events" width="235"> <img src="media/events-ipad.jpg" alt="An event list and selected event side by side on iPad" width="395">
+<img src="media/events-iphone.jpg" alt="The Events tab on iPhone" width="235"> <img src="media/events-ipad.jpg" alt="Events in an adaptive split view on iPad" width="395">
 
-## Try the pilot
+## Using the pilot
 
-Open the **ClubConnect** scheme in `ClubConnect.xcodeproj` with Xcode 27.2. Select an iPhone or iPad and run. The minimum deployment target is iOS 17. The checked-in project builds directly. To regenerate it after editing `project.yml`, run `xcodegen generate` with XcodeGen 2.49.0.
+1. Enter an address ending in **@usc.edu**. Open the verification link on the device that started sign-in. If the sender includes a six-digit code, it can also be entered in the app.
+2. Choose a first club or create one, then enter a name, graduation term, and year. Current students also choose freshman, sophomore, junior, senior, or graduate student. A spring graduate becomes an alum on June 1 and a fall graduate on January 1 of the following year, in Los Angeles time.
+3. Use **Clubs** to find, join, or create clubs. The club menu in Events, People, and Messages switches the active community. Editing a personal profile updates it across memberships.
+4. Organizers can change their club’s name, description, logo, and two colors. **View as a member** hides management tools for that club. **Step down as organizer** gives up the role. A sole organizer chooses a successor before stepping down. MENASA’s initial organizer can redeem the private invitation in Profile.
+5. Open another member’s profile in People and tap **Message**, or start a conversation in **Messages**. Conversations belong to a club and only the participants can read them.
+6. RSVP to an event and open **View ticket**. On a compatible iPhone, **Add to Apple Wallet** installs a signed pass with the same code used at check-in. The Calendar editor, share sheet, and manual or camera-assisted check-in use native iOS controls.
+7. Verified members can open the fictional sample community from Clubs. Debug builds also offer a local preview from the welcome screen. Network features that issue Wallet passes require a verified account.
 
-- **Continue with Apple** joins the live MENASA community. A new member chooses a display name. Profile details and photos are visible to other members. In Profile, a member can sign out or delete their account.
-- **Explore the sample community** opens fictional student and alumni profiles and three upcoming campus events. Sample changes persist on that device. Organizers can try publishing an event and checking in their own sample ticket. Wallet passes are issued for live events.
-- **Organizers** redeem their private one-time invitation in Profile. The club page includes the public invitation, editable identity, colors and logo. Saved events appear in the community's Events tab.
-- **At the door**, open the event's organizer menu and choose **Check in members**. Scan the member's QR code or enter their ticket code. The shared backend binds the ticket to the event and records a single successful check-in.
-- **Internal TestFlight** build 1.0 (1) is available in the MENASA Pilot group. Internal testers need eligible App Store Connect user access. The club invitation opens the app for someone who has installed it. TestFlight enrollment is managed separately. [App Store Connect](https://appstoreconnect.apple.com/apps/6840182659/testflight) · [Club invitation](https://redab2.github.io/clubconnect/?club=menasa)
+<img src="media/profile-iphone.jpg" alt="A centered member profile with class standing and graduation term" width="235"> <img src="media/sample-wallet-pass.jpg" alt="A signed sample event ticket installed in Apple Wallet" width="235">
+
+## Running and testing
+
+Open the **ClubConnect** scheme in `ClubConnect.xcodeproj` with Xcode 27.2. The deployment target is iOS 17. Use **Product → Test** with an iPhone or iPad simulator. The project uses Swift Package Manager. To regenerate the Xcode project after editing `project.yml`, use XcodeGen 2.49.0.
+
+The internal **MENASA Pilot** group is managed in [App Store Connect](https://appstoreconnect.apple.com/apps/6840182659/testflight). The [campus invitation](https://redab2.github.io/clubconnect/?club=menasa) opens the installed app. TestFlight enrollment is separate. The invitation page lives in `docs/` and is served from the `gh-pages` branch.
 
 ## Shared service
 
-The pilot uses Supabase Auth, PostgreSQL, and an Edge Function that signs Wallet passes. The iOS app contains the public project URL and publishable key. Account permissions, organizer invitations, and ticket ownership are checked in PostgreSQL. The server stores only a digest of each one-time organizer invitation. Wallet signing keys belong in Edge Function secrets.
+The hosted Supabase project runs email authentication, member-scoped PostgreSQL operations, direct messages, and an Edge Function for Wallet signing. The iOS app uses the public project URL and publishable key. The selected club never grants organizer authority on its own. Each privileged operation checks membership on the server. Wallet signing material stays in Edge Function secrets.
 
-Database migrations are in `supabase/migrations`. The rollback-only regression in `supabase/tests/pilot_flows.sql` runs with an administrative PostgreSQL connection and exercises both member and organizer access. UI tests are in `ClubConnectUITests`. Select **Product → Test** with an iPhone or iPad simulator.
+When a message is sent or read, Supabase Realtime signals the participants’ open inboxes. Each device retrieves new messages through the authenticated conversation API. The app also catches up after reconnecting.
 
-The invitation page is maintained in `docs/` and served from the root of the `gh-pages` branch. Its Open button carries the club or event into the installed app. To publish changes to the invitation page, push the `docs/` subtree to `gh-pages`.
+**Verification email delivery requires a transactional sender.** Supabase’s default sender only delivers to project-team addresses. Configure the authorized From address and SMTP credentials in [Club Connect Auth settings](https://supabase.com/dashboard/project/kdbuclwxzgndhpukxwrn/auth/smtp). Keep credentials out of Git. The mobile flow supports PKCE verification links and the optional Supabase email template token `{{ .Token }}`. [Supabase SMTP documentation](https://supabase.com/docs/guides/auth/auth-smtp)
+
+Versioned schema changes live in `supabase/migrations/`. The scripts in `supabase/tests/` run against a migrated database with an administrative PostgreSQL connection. They roll back their synthetic users, clubs, messages, and tickets.
 
 ## Artwork
 

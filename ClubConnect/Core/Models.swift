@@ -52,15 +52,63 @@ enum MemberKind: String, CaseIterable, Codable, Hashable {
     case student, alumni
 }
 
+enum GraduationTerm: String, CaseIterable, Codable {
+    case spring, fall
+    var title: String { rawValue.capitalized }
+
+    static let campusCalendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+        return calendar
+    }()
+
+    static var validYears: ClosedRange<Int> {
+        1900...(campusCalendar.component(.year, from: .now) + 12)
+    }
+
+    static let cutoffDescription = "Your profile changes to Alumni on June 1 after a spring graduation or January 1 after a fall graduation, in Los Angeles time."
+
+    func kind(year: Int, at date: Date = .now) -> MemberKind {
+        let current = Self.campusCalendar.dateComponents([.year, .month], from: date)
+        let campusYear = current.year ?? year
+        if campusYear != year { return campusYear > year ? .alumni : .student }
+        return self == .spring && (current.month ?? 1) >= 6 ? .alumni : .student
+    }
+}
+
+enum ClassStanding: String, CaseIterable, Codable {
+    case freshman, sophomore, junior, senior, graduate
+    var title: String { self == .graduate ? "Graduate student" : rawValue.capitalized }
+}
+
 struct Member: Identifiable, Codable, Hashable {
     var id: String
     var name: String
+    // Kept for decoding older snapshots. Current membership comes from graduation.
     var kind: MemberKind
     var major = ""
     var interests: [String] = []
     var experience = ""
     var bio = ""
     var photoData: Data? = nil
+    var graduationTerm: GraduationTerm? = nil
+    var graduationYear: Int? = nil
+    var classStanding: ClassStanding? = nil
+
+    var graduationLabel: String? {
+        guard let graduationTerm, let graduationYear else { return nil }
+        return "\(graduationTerm.title) \(graduationYear)"
+    }
+
+    func effectiveKind(at date: Date = .now) -> MemberKind? {
+        guard let graduationTerm, let graduationYear else { return nil }
+        return graduationTerm.kind(year: graduationYear, at: date)
+    }
+
+    func hasCompleteAcademicProfile(at date: Date = .now) -> Bool {
+        guard let kind = effectiveKind(at: date) else { return false }
+        return kind == .alumni || classStanding != nil
+    }
 }
 
 struct ClubEvent: Identifiable, Codable, Hashable {
@@ -94,15 +142,17 @@ struct CommunityState: Codable {
         accentHex: "#974A30")
 
     static func sample(now: Date = .now) -> Self {
+        let campusYear = GraduationTerm.campusCalendar.component(.year, from: now)
         let me = Member(id: "demo-organizer", name: "Noor Haddad", kind: .student,
                         major: "Architecture", interests: ["Design", "Film", "Arabic coffee"],
-                        experience: "Events coordinator at MENASA", bio: "Usually sketching something between classes.")
+                        experience: "Events coordinator at MENASA", bio: "Usually sketching something between classes.",
+                        graduationTerm: .spring, graduationYear: campusYear + 2, classStanding: .junior)
         let people = [
             me,
-            Member(id: "demo-yasmin", name: "Yasmin Mansour", kind: .alumni, major: "Computer Science", interests: ["Mentorship", "Music"], experience: "Software engineer", bio: "Happy to talk about the first year after graduation."),
-            Member(id: "demo-omar", name: "Omar Benali", kind: .student, major: "Film Studies", interests: ["Cinema", "Photography"], bio: "Planning our next film night."),
-            Member(id: "demo-lina", name: "Lina Khoury", kind: .student, major: "Public Health", interests: ["Food", "Community gardens"]),
-            Member(id: "demo-samir", name: "Samir Osman", kind: .alumni, major: "Mechanical Engineering", interests: ["Robotics", "Cycling"], experience: "Product design engineer")
+            Member(id: "demo-yasmin", name: "Yasmin Mansour", kind: .alumni, major: "Computer Science", interests: ["Mentorship", "Music"], experience: "Software engineer", bio: "Happy to talk about the first year after graduation.", graduationTerm: .spring, graduationYear: campusYear - 1),
+            Member(id: "demo-omar", name: "Omar Benali", kind: .student, major: "Film Studies", interests: ["Cinema", "Photography"], bio: "Planning our next film night.", graduationTerm: .fall, graduationYear: campusYear + 1, classStanding: .senior),
+            Member(id: "demo-lina", name: "Lina Khoury", kind: .student, major: "Public Health", interests: ["Food", "Community gardens"], graduationTerm: .spring, graduationYear: campusYear + 3, classStanding: .sophomore),
+            Member(id: "demo-samir", name: "Samir Osman", kind: .alumni, major: "Mechanical Engineering", interests: ["Robotics", "Cycling"], experience: "Product design engineer", graduationTerm: .fall, graduationYear: campusYear - 4)
         ]
         let calendar = Calendar.current
         func event(_ id: String, _ days: Int, _ hour: Int, _ title: String, _ summary: String, _ place: String, _ category: String) -> ClubEvent {

@@ -27,8 +27,9 @@ struct EventTicketView: View {
                                 .font(.subheadline)
                             Text(event.location).font(.subheadline).foregroundStyle(Color.primary.opacity(0.68))
                         }
-                        Divider()
+                        walletAction(ticket)
                         if !ticket.checkedIn {
+                            Divider()
                             let payload = TicketBarcode.payload(eventID: event.id, code: ticket.code)
                             if let qr = TicketBarcode.image(payload: payload) {
                                 Image(decorative: qr, scale: 1)
@@ -46,12 +47,6 @@ struct EventTicketView: View {
                                     .textSelection(.enabled)
                                     .multilineTextAlignment(.center)
                             }
-                        }
-                        if store.walletAvailable, PKAddPassesViewController.canAddPasses(), !ticket.checkedIn, event.endsAt >= .now {
-                            WalletButton { Task { await loadPass() } }
-                                .frame(width: 164, height: 48)
-                                .disabled(loading)
-                                .accessibilityLabel("Add to Apple Wallet")
                         }
                     }
                     .padding(24)
@@ -86,6 +81,40 @@ struct EventTicketView: View {
         }
     }
 
+    @ViewBuilder private func walletAction(_ ticket: EventTicket) -> some View {
+        if ticket.checkedIn {
+            walletNote("This ticket has been used. No new Wallet pass is needed.")
+        } else if event.endsAt < .now {
+            walletNote("This event has ended.")
+        } else if !PKAddPassesViewController.canAddPasses() {
+            walletNote("To add this ticket to Apple Wallet, open it on a compatible iPhone. You can check in with the code below.")
+        } else if !store.walletAvailable {
+            walletNote("Sign in with your USC account to add a pass to Apple Wallet. The sample check-in code is available below.")
+        } else {
+            VStack(spacing: 6) {
+                WalletButton { Task { await loadPass() } }
+                    .frame(width: 168, height: 50)
+                    .disabled(loading)
+                    .accessibilityLabel("Add to Apple Wallet")
+                    .accessibilityIdentifier("add-ticket-to-wallet")
+                if loading {
+                    ProgressView("Preparing pass").font(.footnote)
+                } else if store.isPreview {
+                    Text("This pass is for sample check-in.")
+                        .font(.footnote).foregroundStyle(Color.primary.opacity(0.72))
+                }
+            }
+        }
+    }
+
+    private func walletNote(_ text: String) -> some View {
+        Label(text, systemImage: "wallet.pass")
+            .accessibilityIdentifier("wallet-status")
+            .font(.footnote)
+            .foregroundStyle(Color.primary.opacity(0.72))
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
     @MainActor private func cancel() async {
         guard !loading else { return }
         loading = true
@@ -118,15 +147,20 @@ private struct WalletSheet: Identifiable {
 }
 
 private struct WalletButton: UIViewRepresentable {
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.isEnabled) private var isEnabled
     let action: () -> Void
 
     func makeUIView(context: Context) -> PKAddPassButton {
-        let button = PKAddPassButton(addPassButtonStyle: .black)
+        let button = PKAddPassButton(addPassButtonStyle: colorScheme == .dark ? .blackOutline : .black)
         button.addAction(UIAction { _ in action() }, for: .touchUpInside)
         return button
     }
 
-    func updateUIView(_ button: PKAddPassButton, context: Context) {}
+    func updateUIView(_ button: PKAddPassButton, context: Context) {
+        button.addPassButtonStyle = colorScheme == .dark ? .blackOutline : .black
+        button.isEnabled = isEnabled
+    }
 }
 
 private struct WalletPassPresenter: UIViewControllerRepresentable {

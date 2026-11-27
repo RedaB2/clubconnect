@@ -1,4 +1,3 @@
-import AuthenticationServices
 import SwiftUI
 
 @main
@@ -14,21 +13,25 @@ struct ClubConnectApp: App {
     }
 }
 
-private enum Destination: Hashable { case events, people, club, profile }
+private enum Destination: Hashable { case events, people, club, messages, profile }
 
 private struct Invitation: Equatable {
     var event: String?
+    var clubID: String
     var sample: Bool
     init?(_ url: URL) {
         guard url.scheme == "clubconnect", let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
         let path = url.lastPathComponent
         switch url.host {
-        case "join" where path == "menasa": event = nil
+        case "join": clubID = path; event = nil
         case "event":
             guard let uuid = UUID(uuidString: path) else { return nil }
             event = uuid.uuidString.lowercased()
+            clubID = components.queryItems?.first(where: { $0.name == "club" })?.value ?? "menasa"
         default: return nil
         }
+        guard clubID == "menasa" || UUID(uuidString: clubID) != nil else { return nil }
+        clubID = clubID.lowercased()
         sample = components.queryItems?.contains(.init(name: "sample", value: "1")) ?? false
     }
 }
@@ -38,11 +41,11 @@ private struct EventLink: Identifiable { let id: String }
 private struct AppRoot: View {
     @Environment(ClubStore.self) private var store
     @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.openURL) private var openURL
     @State private var tab = Destination.events
     @State private var route: Invitation?
     @State private var linkedEvent: EventLink?
     @State private var switchCommunity = false
+    @State private var joinInvitation: ClubListing?
 
     var body: some View {
         Group {
@@ -71,6 +74,13 @@ private struct AppRoot: View {
             if phase == .active, store.phase == .community { Task { await store.refresh() } }
         }
         .onOpenURL { url in
+            if url.scheme == "clubconnect", url.host == "auth", url.path == "/callback" {
+                Task {
+                    do { try await store.verifyEmailLink(url) }
+                    catch { store.notice = error.localizedDescription }
+                }
+                return
+            }
             guard let link = Invitation(url) else { return }
             route = link
             Task { await store.refresh(); followLink() }
@@ -90,39 +100,72 @@ private struct AppRoot: View {
             }
             Button("Cancel", role: .cancel) { route = nil }
         }
+        .alert("Join " + (joinInvitation?.club.name ?? "club") + "?", isPresented: Binding(
+            get: { joinInvitation != nil }, set: { if !$0 { joinInvitation = nil } }
+        ), presenting: joinInvitation) { listing in
+            Button("Join club") {
+                Task {
+                    do { try await store.joinAdditionalClub(listing.id); followLink() }
+                    catch { route = nil; store.notice = error.localizedDescription }
+                }
+            }
+            Button("Cancel", role: .cancel) { route = nil }
+        } message: { _ in Text("Joining makes your profile visible to the other members.") }
         .alert("Club Connect", isPresented: Binding(get: { store.notice != nil }, set: { if !$0 { store.notice = nil } })) {
             Button("OK") { store.notice = nil }
         } message: { Text(store.notice ?? "") }
         .alert("Account deleted", isPresented: Binding(get: { store.showAccountDeleted }, set: { store.showAccountDeleted = $0 })) {
-            Button("Apple’s instructions") { openURL(URL(string: "https://support.apple.com/en-us/102571")!) }
             Button("Done", role: .cancel) {}
         } message: {
-            Text("Your Club Connect profile and registrations have been deleted. You can also remove Club Connect from Sign in with Apple in Settings.")
+            Text("Your Club Connect profile and registrations have been deleted.")
         }
     }
 
     @ViewBuilder private var tabs: some View {
         if #available(iOS 18, *) {
             TabView(selection: $tab) {
-                Tab("Events", systemImage: "calendar", value: .events) { EventsView() }
-                Tab("People", systemImage: "person.2", value: .people) { PeopleView() }
-                Tab("Club", systemImage: "building.columns", value: .club) { ClubView() }
+                Tab("Events", systemImage: "calendar", value: .events) { EventsView().id(store.club.id) }
+                Tab("People", systemImage: "person.2", value: .people) { PeopleView().id(store.club.id) }
+                Tab("Clubs", systemImage: "building.columns", value: .club) { ClubView() }
+                Tab("Messages", systemImage: "bubble.left.and.bubble.right", value: .messages) { MessagesView().id(store.club.id) }
                 Tab("Profile", systemImage: "person.crop.circle", value: .profile) { MyProfileView() }
             }.tabViewStyle(.sidebarAdaptable)
         } else {
             TabView(selection: $tab) {
-                EventsView().tabItem { Label("Events", systemImage: "calendar") }.tag(Destination.events)
-                PeopleView().tabItem { Label("People", systemImage: "person.2") }.tag(Destination.people)
-                ClubView().tabItem { Label("Club", systemImage: "building.columns") }.tag(Destination.club)
+                EventsView().id(store.club.id).tabItem { Label("Events", systemImage: "calendar") }.tag(Destination.events)
+                PeopleView().id(store.club.id).tabItem { Label("People", systemImage: "person.2") }.tag(Destination.people)
+                ClubView().tabItem { Label("Clubs", systemImage: "building.columns") }.tag(Destination.club)
+                MessagesView().id(store.club.id).tabItem { Label("Messages", systemImage: "bubble.left.and.bubble.right") }.tag(Destination.messages)
                 MyProfileView().tabItem { Label("Profile", systemImage: "person.crop.circle") }.tag(Destination.profile)
             }
         }
     }
 
     private func followLink() {
-        guard let route, store.phase == .community else { return }
+        guard let route else { return }
+        if store.phase == .enrollment, !store.completingProfile,
+           store.catalog.contains(where: { $0.id == route.clubID && $0.canJoin }) {
+            store.enrollmentClubID = route.clubID
+        }
+        guard store.phase == .community else { return }
         if route.sample != store.isPreview {
             switchCommunity = true
+            return
+        }
+        if route.clubID != store.club.id {
+            guard let target = store.catalog.first(where: { $0.id == route.clubID }) else {
+                self.route = nil
+                store.notice = "This club is unavailable."
+                return
+            }
+            if !target.joined {
+                joinInvitation = target
+                return
+            }
+            Task {
+                do { try await store.selectClub(target.id); followLink() }
+                catch { self.route = nil; store.notice = error.localizedDescription }
+            }
             return
         }
         self.route = nil
@@ -131,105 +174,6 @@ private struct AppRoot: View {
             linkedEvent = EventLink(id: id)
         } else {
             tab = .club
-        }
-    }
-}
-
-private struct WelcomeView: View {
-    @Environment(ClubStore.self) private var store
-    @Environment(\.colorScheme) private var scheme
-    @Environment(\.dynamicTypeSize) private var typeSize
-    @State private var nonce: String?
-    @State private var busy = false
-    let sampleInvitation: Bool
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                HStack(spacing: 10) {
-                    Image("ClubMark").resizable().frame(width: 34, height: 34).accessibilityHidden(true)
-                    Text("Club Connect").font(.headline)
-                }
-                .padding(.top, 10)
-                Image("Gathering")
-                    .resizable().scaledToFill()
-                    .frame(maxWidth: .infinity)
-                    .frame(height: typeSize.isAccessibilitySize ? 152 : 244)
-                    .clipped().clipShape(RoundedRectangle(cornerRadius: 22))
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Welcome to MENASA")
-                        .font(.system(.largeTitle, design: .serif, weight: .semibold))
-                        .accessibilityAddTraits(.isHeader)
-                    Text("Middle Eastern and North African Association")
-                        .font(.headline).foregroundStyle(store.club.accent)
-                    Text("See what’s happening on campus, meet students and alumni, and keep your event tickets together.")
-                        .font(.body).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                VStack(spacing: 8) {
-                    SignInWithAppleButton(.continue) { request in
-                        let raw = PilotAuth.nonce()
-                        nonce = raw
-                        request.requestedScopes = [.fullName]
-                        request.nonce = PilotAuth.hash(raw)
-                    } onCompletion: { result in
-                        defer { nonce = nil }
-                        do {
-                            let authorization = try result.get()
-                            guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
-                                  let raw = nonce else { throw ClubFailure("Please try signing in again.") }
-                            busy = true
-                            Task {
-                                defer { busy = false }
-                                do { try await store.signIn(credential, rawNonce: raw) }
-                                catch { store.notice = error.localizedDescription }
-                            }
-                        } catch let error as ASAuthorizationError where error.code == .canceled {
-                            return
-                        } catch { store.notice = error.localizedDescription }
-                    }
-                    .signInWithAppleButtonStyle(scheme == .dark ? .white : .black)
-                    .frame(height: 50)
-                    .accessibilityLabel("Continue with Apple")
-                    Button { store.openSample() } label: {
-                        Text(sampleInvitation ? "Open sample invitation" : "Explore the sample community")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .accessibilityIdentifier("explore-demo")
-                    if busy { ProgressView() }
-                }.disabled(busy)
-            }
-            .padding(24).frame(maxWidth: 580)
-            .frame(maxWidth: .infinity)
-        }.background(Color(uiColor: .systemBackground))
-    }
-}
-
-private struct EnrollmentView: View {
-    @Environment(ClubStore.self) private var store
-    @State private var name = ""
-    @State private var saving = false
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    TextField("Your name", text: $name).textContentType(.name).textInputAutocapitalization(.words)
-                } footer: { Text("Your name and the profile details you add will be visible to other MENASA members.") }
-                Button("Join MENASA") {
-                    saving = true
-                    Task {
-                        defer { saving = false }
-                        do { try await store.join(name: name.trimmingCharacters(in: .whitespacesAndNewlines)) }
-                        catch { store.notice = error.localizedDescription }
-                    }
-                }.disabled(saving || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            }
-            .navigationTitle("Join MENASA")
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { Task { try? await store.leaveSession() } }.disabled(saving) } }
-            .onAppear { if name.isEmpty { name = store.suggestedName } }
         }
     }
 }

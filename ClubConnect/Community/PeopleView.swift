@@ -11,7 +11,7 @@ struct PeopleView: View {
     private var matches: [Member] {
         let words = query.communityTrimmed.split(whereSeparator: \.isWhitespace)
         return store.members.filter { member in
-            guard filter.matches(member.kind) else { return false }
+            guard filter.matches(member.effectiveKind()) else { return false }
             let fields = [member.name, member.major] + member.interests
             return words.allSatisfy { word in
                 fields.contains { $0.localizedStandardContains(String(word)) }
@@ -66,11 +66,16 @@ struct PeopleView: View {
             .listStyle(.plain)
             .refreshable { await store.refresh() }
             .navigationTitle("People")
+            .toolbar { ToolbarItem(placement: .topBarLeading) { ActiveClubMenu() } }
             .navigationSplitViewColumnWidth(min: 280, ideal: 360, max: 500)
             .searchable(text: $query, prompt: "Name, major, or interest")
         } detail: {
             if let selectedID, let member = store.members.first(where: { $0.id == selectedID }) {
-                MemberProfile(member: member)
+                MemberProfile(member: member) {
+                    if member.id != store.me.id {
+                        Section { MessageMemberButton(member: member) }
+                    }
+                }
                     .navigationTitle("Member profile")
                     .navigationBarTitleDisplayMode(.inline)
             } else {
@@ -85,7 +90,7 @@ private enum DirectoryFilter: String, CaseIterable {
     case students = "Students"
     case alumni = "Alumni"
 
-    func matches(_ kind: MemberKind) -> Bool {
+    func matches(_ kind: MemberKind?) -> Bool {
         switch self {
         case .everyone: true
         case .students: kind == .student
@@ -103,7 +108,7 @@ private struct MemberRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(member.name)
                     .font(.headline)
-                Text([member.kind.communityTitle, member.major].filter { !$0.isEmpty }.joined(separator: " · "))
+                Text([member.effectiveKind()?.communityTitle ?? "Graduation term needed", member.major].filter { !$0.isEmpty }.joined(separator: " · "))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }

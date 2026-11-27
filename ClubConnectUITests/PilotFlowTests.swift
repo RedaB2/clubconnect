@@ -24,6 +24,8 @@ final class PilotFlowTests: XCTestCase {
         app.buttons["RSVP"].tap()
         let ticketCode = app.descendants(matching: .any)["event-ticket-code"].firstMatch
         XCTAssertTrue(ticketCode.waitForExistence(timeout: 5))
+        let walletStatus = app.descendants(matching: .any)["wallet-status"].firstMatch
+        XCTAssertTrue(walletStatus.exists, "The offline fixture should explain how to get a Wallet pass.")
         let code = ticketCode.label.isEmpty ? (try XCTUnwrap(ticketCode.value as? String)) : ticketCode.label
         XCTAssertFalse(code.isEmpty)
         app.buttons["Done"].tap()
@@ -69,6 +71,35 @@ final class PilotFlowTests: XCTestCase {
         XCTAssertTrue(student.waitForExistence(timeout: 5))
         student.tap()
         XCTAssertTrue(app.staticTexts["Architecture and Design"].waitForExistence(timeout: 5))
+    }
+
+    func testGraduationProfileAndAlumniDirectory() throws {
+        let app = launchDemo()
+        app.tabBars.buttons["Profile"].tap()
+        let name = app.staticTexts["Noor Haddad"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        XCTAssertEqual(name.frame.midX, app.frame.midX, accuracy: 3)
+        attachScreenshot("Centered member profile")
+
+        app.buttons["Edit profile"].tap()
+        let year = app.textFields["graduation-year-input"]
+        if !year.exists { app.swipeUp() }
+        XCTAssertTrue(year.waitForExistence(timeout: 5), app.debugDescription)
+        year.tap()
+        year.typeKey("a", modifierFlags: .command)
+        year.typeText("2004")
+        XCTAssertEqual(year.value as? String, "2004")
+        app.buttons["Save"].tap()
+        XCTAssertTrue(app.staticTexts["Alumni"].waitForExistence(timeout: 5))
+
+        app.tabBars.buttons["People"].tap()
+        app.buttons["Students"].tap()
+        let changedMember = app.descendants(matching: .any)["member-demo-organizer"].firstMatch
+        XCTAssertFalse(changedMember.exists)
+        app.buttons["Alumni"].tap()
+        XCTAssertTrue(changedMember.waitForExistence(timeout: 5))
+        changedMember.tap()
+        XCTAssertTrue(app.staticTexts["Noor Haddad"].waitForExistence(timeout: 5))
     }
 
     func testCalendarEditorContainsSelectedEvent() {
