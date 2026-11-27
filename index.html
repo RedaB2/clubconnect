@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#813d2d">
+  <title>MENASA invitation · Club Connect</title>
+  <style>
+    :root { color-scheme: light dark; --paper:#faf6ef; --ink:#2b231f; --muted:#625651; --accent:#813d2d; --button:#fff8ed }
+    @media(prefers-color-scheme:dark){:root{--paper:#211d19;--ink:#faf3e5;--muted:#d5c5b6;--accent:#efb193;--button:#261b16}}
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100svh;display:grid;place-items:center;background:var(--paper);color:var(--ink);font:1rem/1.55 -apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif}
+    main{max-width:36rem;padding:2rem}
+    header{font-weight:650;display:flex;align-items:center;gap:.65rem}header img{border-radius:12px;width:42px;height:42px}
+    h1{font:500 clamp(2.7rem,8vw,4rem)/1.05 Georgia,serif;margin:2.5rem 0 1rem;letter-spacing:-.035em}
+    p{color:var(--muted)}
+    .open{display:inline-block;background:var(--accent);color:var(--button);border-radius:999px;padding:.8rem 1.3rem;text-decoration:none;font-weight:600;margin:.5rem 0 1.5rem}
+    aside{border-top:1px solid var(--muted);padding-top:1rem}
+    a{color:var(--accent)} a:focus-visible{outline:3px solid currentColor;outline-offset:4px}
+  </style>
+</head>
+<body><main>
+  <header><img src="./icon.png" alt="">Club Connect</header>
+  <h1 id="title">Join MENASA</h1>
+  <p id="detail">Open the Middle Eastern and North African Association’s community on your iPhone or iPad.</p>
+  <a class="open" id="open" href="clubconnect://join/menasa">Open in Club Connect</a>
+  <aside><strong>Installing the pilot?</strong><p>Ask the club organizer for a TestFlight invitation. After accepting it, install Club Connect in TestFlight, then return to this link.</p></aside>
+</main>
+<script>
+  const query = new URLSearchParams(location.search);
+  const id = query.get('event');
+  if (query.get('club') === 'menasa' && /^[a-f\d]{8}(-[a-f\d]{4}){3}-[a-f\d]{12}$/i.test(id || '')) {
+    document.getElementById('title').textContent = 'Your event invitation';
+    document.getElementById('detail').textContent = 'Open this MENASA event in Club Connect to see the details and RSVP.';
+    document.getElementById('open').href = 'clubconnect://event/' + id + (query.get('sample') === '1' ? '?sample=1' : '');
+  }
+</script></body>
+</html>
