@@ -11,15 +11,15 @@ begin
     result := public.before_usc_signup(jsonb_build_object('user',jsonb_build_object('email',student||'@USC.edu')));
     assert result = '{}'::jsonb, 'Exact USC domain accepted regardless of case';
     result := public.before_usc_signup('{"user":{"email":"test@usc.edu.example"}}');
-    assert result->'error'->>'http_code' = '403', 'Lookalike domains denied before delivery';
+    assert result='{}'::jsonb and not club_private.is_usc_email('test@usc.edu.example'), 'Lookalikes have only the personal alumni path';
     result := public.before_usc_signup('{"user":{"email":"test@dept.usc.edu"}}');
-    assert result->'error'->>'http_code' = '403', 'Subdomains excluded';
+    assert result='{}'::jsonb and not club_private.is_usc_email('test@dept.usc.edu'), 'Subdomains do not grant campus privileges';
     result := public.before_usc_signup('{"user":{"email":"test@usc.edu","app_metadata":{"provider":"apple"}}}');
     assert result->'error'->>'http_code' = '403', 'Other identity providers excluded';
 
     begin
-        insert into auth.users (id,email,raw_app_meta_data) values(invalid_id,invalid_id||'@example.invalid','{"provider":"email"}');
-        raise exception 'Non-USC account created' using errcode='XX000';
+        insert into auth.users (id,email,raw_app_meta_data) values(invalid_id,invalid_id||',x@example.invalid','{"provider":"email"}');
+        raise exception 'Malformed personal account created' using errcode='XX000';
     exception when check_violation then null;
     end;
     insert into auth.users (id,email,raw_app_meta_data) values(student,student||'@usc.edu','{"provider":"email"}');

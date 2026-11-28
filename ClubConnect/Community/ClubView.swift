@@ -54,7 +54,9 @@ struct ClubView: View {
             List {
                 let matches = store.catalog.filter { query.isEmpty || $0.club.name.localizedStandardContains(query) || $0.club.fullName.localizedStandardContains(query) }
                 let memberships = matches.filter(\.joined)
-                let available = matches.filter { !$0.joined && $0.canJoin }
+                let statuses = Dictionary(grouping: store.alumniApplications, by: \.clubID)
+                    .compactMapValues { rows in rows.max { $0.submittedAt < $1.submittedAt }?.statusTitle }
+                let available = matches.filter { !$0.joined && ($0.canJoin || statuses[$0.id] != nil) }
                 if memberships.isEmpty && available.isEmpty && !query.isEmpty {
                     ContentUnavailableView.search(text: query)
                         .listRowBackground(Color.clear)
@@ -70,20 +72,24 @@ struct ClubView: View {
                             } label: { clubRow(entry, joined: true) }
                             .accessibilityIdentifier("select-club-" + entry.id)
                         }
-                    }
+                    }.listRowBackground(theme.surface)
                 }
-                if !available.isEmpty {
+                let requested = available.filter { statuses[$0.id] != nil }
+                if !requested.isEmpty {
+                    Section("Your requests") {
+                        ForEach(requested) { entry in applyRow(entry, status: statuses[entry.id]) }
+                    }.listRowBackground(theme.surface)
+                }
+                let discoverable = available.filter { statuses[$0.id] == nil }
+                if !discoverable.isEmpty {
                     Section("Discover clubs") {
-                        ForEach(available) { entry in
-                            Button { joining = entry } label: { clubRow(entry, joined: false) }
-                                .accessibilityIdentifier("discover-club-" + entry.id)
-                        }
-                    }
+                        ForEach(discoverable) { entry in applyRow(entry) }
+                    }.listRowBackground(theme.surface)
                 }
-                if !store.isPreview {
+                if !store.isPreview && !store.isAlumniAccount {
                     Section {
                         Button("Explore the sample community") { store.openSample() }
-                    }
+                    }.listRowBackground(theme.surface)
                 }
             }
             .disabled(busy)
@@ -92,8 +98,14 @@ struct ClubView: View {
             .searchable(text: $query, prompt: "Find a club")
             .refreshable { await store.refresh() }
             .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button { creating = true } label: { Label("Create a club", systemImage: "plus") }
+                if store.isAlumniAccount {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button { Task { await store.refresh() } } label: { Label("Refresh memberships", systemImage: "arrow.clockwise") }
+                    }
+                } else {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button { creating = true } label: { Label("Create a club", systemImage: "plus") }
+                    }
                 }
             }
             .navigationDestination(for: ClubRoute.self) { route in
@@ -111,23 +123,29 @@ struct ClubView: View {
             }
             .sheet(isPresented: $creating) { CreateClubView { path = [.club(store.club.id)] } }
             .sheet(item: $joining) { entry in
-                NavigationStack {
-                    List {
-                        Section { ClubIdentity(club: entry.club) }.listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
-                        if !entry.club.about.isEmpty { Section("About") { Text(entry.club.about) } }
-                        Button("Join " + entry.club.name) {
-                            perform {
-                                try await store.joinAdditionalClub(entry.id)
-                                joining = nil
-                                path = [.club(entry.id)]
+                if store.isAlumniAccount {
+                    AlumniApplicationSheet(club: entry.club) {}
+                } else {
+                    NavigationStack {
+                        List {
+                            Section { ClubIdentity(club: entry.club) }.listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
+                            if !entry.club.about.isEmpty {
+                                Section("About") { Text(entry.club.about) }.listRowBackground(BrandTheme(club: entry.club).surface)
                             }
-                        }.disabled(busy)
+                            Button("Join " + entry.club.name) {
+                                perform {
+                                    try await store.joinAdditionalClub(entry.id)
+                                    joining = nil
+                                    path = [.club(entry.id)]
+                                }
+                            }.disabled(busy).listRowBackground(BrandTheme(club: entry.club).surface)
+                        }
+                        .navigationTitle("Join club").navigationBarTitleDisplayMode(.inline)
+                        .brandListBackground()
+                        .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { joining = nil } } }
                     }
-                    .navigationTitle("Join club").navigationBarTitleDisplayMode(.inline)
-                    .brandListBackground()
-                    .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { joining = nil } } }
+                    .brandScope(entry.club)
                 }
-                .brandScope(entry.club)
             }
         }
         .onChange(of: invitedClub, initial: true) { _, _ in openInvitation() }
@@ -147,13 +165,29 @@ struct ClubView: View {
         self.invitedClub = nil
     }
 
-    private func clubRow(_ entry: ClubListing, joined: Bool) -> some View {
+    private func applyRow(_ entry: ClubListing, status: String? = nil) -> some View {
+        Button { joining = entry } label: { clubRow(entry, joined: false, status: status) }
+            .accessibilityIdentifier("discover-club-" + entry.id)
+    }
+
+    private func clubRow(_ entry: ClubListing, joined: Bool, status: String? = nil) -> some View {
         HStack(spacing: 12) {
             ClubBadge(club: entry.club, side: 44)
             VStack(alignment: .leading, spacing: 4) {
                 Text(entry.club.name).font(.headline).foregroundStyle(theme.ink)
-                if joined { Text(entry.isAdmin ? "Organizer" : "Member").font(.subheadline).foregroundStyle(theme.ink.opacity(0.74)) }
-                else if entry.club.fullName != entry.club.name { Text(entry.club.fullName).font(.subheadline).foregroundStyle(theme.ink.opacity(0.74)) }
+                if joined {
+                    if entry.isAdmin, let count = entry.pendingRequestCount, count > 0 {
+                        Text(count == 1 ? "1 membership request" : "\(count) membership requests")
+                            .font(.subheadline.weight(.medium)).foregroundStyle(theme.accent)
+                    } else {
+                        Text(entry.isAdmin ? "Organizer" : "Member").font(.subheadline).foregroundStyle(theme.ink.opacity(0.74))
+                    }
+                }
+                else if let status {
+                    Text(status).font(.subheadline).foregroundStyle(theme.accent)
+                } else if entry.club.fullName != entry.club.name {
+                    Text(entry.club.fullName).font(.subheadline).foregroundStyle(theme.ink.opacity(0.74))
+                }
             }
             Spacer()
             if entry.id == store.club.id { Image(systemName: "checkmark.circle.fill").accessibilityLabel("Active club") }
@@ -173,6 +207,7 @@ struct ClubView: View {
 }
 
 private struct CreateClubView: View {
+    @Environment(\.brandTheme) private var theme
     @Environment(ClubStore.self) private var store
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
@@ -183,8 +218,8 @@ private struct CreateClubView: View {
         NavigationStack {
             Form {
                 Section { TextField("Club name", text: $name).textInputAutocapitalization(.words) }
-                footer: { Text("You’ll be the first organizer. You can set your club’s logo, colors, and description next.") }
-                if let problem { Text(problem).foregroundStyle(.red) }
+                footer: { Text("You’ll be the first organizer. You can set your club’s logo, colors, and description next.") }.listRowBackground(theme.surface)
+                if let problem { Text(problem).foregroundStyle(.red).listRowBackground(theme.surface) }
             }
             .brandListBackground()
             .navigationTitle("Create a club")
@@ -208,9 +243,11 @@ private struct CreateClubView: View {
 
 private struct CurrentClubView: View {
     @Environment(ClubStore.self) private var store
+    @Environment(\.brandTheme) private var theme
     @State private var editing = false
     @State private var steppingDown = false
     @State private var creatingEvent = false
+    @State private var reviewingApplications = false
     var onShowEvents: () -> Void
     var openEvent: (String) -> Void
 
@@ -227,6 +264,9 @@ private struct CurrentClubView: View {
         .sheet(isPresented: $editing) { ClubEditor(club: store.club) }
         .sheet(isPresented: $steppingDown) { StepDownView() }
         .sheet(isPresented: $creatingEvent) { EventEditorView(event: nil, onSave: openEvent) }
+        .sheet(isPresented: $reviewingApplications) {
+            AlumniReviewQueue(club: store.club).brandScope(store.club)
+        }
     }
 
     private func clubPage(at now: Date) -> some View {
@@ -254,20 +294,35 @@ private struct CurrentClubView: View {
                     Button { creatingEvent = true } label: { Label("Create event", systemImage: "calendar.badge.plus") }
                         .accessibilityIdentifier("club-create-event")
                 }
-            }
+            }.listRowBackground(theme.surface)
 
             if store.hasOrganizerRole {
                 Section {
                     Toggle("View as a member", isOn: Binding(get: { store.viewingAsMember }, set: { store.setMemberView($0) }))
                         .accessibilityIdentifier("member-view-toggle")
                     if !store.viewingAsMember {
+                        Button { reviewingApplications = true } label: {
+                            HStack {
+                                Label("Membership requests", systemImage: "person.crop.circle.badge.clock")
+                                Spacer()
+                                if let count = store.catalog.first(where: { $0.id == store.club.id })?.pendingRequestCount, count > 0 {
+                                    Text(count.formatted()).font(.subheadline.monospacedDigit().weight(.semibold))
+                                        .padding(.horizontal, 8).padding(.vertical, 3)
+                                        .background(theme.wash, in: Capsule())
+                                        .accessibilityLabel("\(count) pending")
+                                }
+                            }
+                        }.accessibilityIdentifier("review-alumni-requests")
                         Button("Step down as organizer") { steppingDown = true }
                     }
                 } header: { Text("Your role") } footer: {
                     Text("Member view hides the organizer tools for this club. You can switch back here.")
-                }
+                }.listRowBackground(theme.surface)
             }
-            if !store.club.about.isEmpty { Section("About the club") { Text(store.club.about).textSelection(.enabled) } }
+            if !store.club.about.isEmpty {
+                Section("About the club") { Text(store.club.about).textSelection(.enabled) }
+                    .listRowBackground(theme.surface)
+            }
             Section("Community") {
                 LabeledContent("Students", value: String(store.members.filter { $0.effectiveKind() == .student }.count))
                 LabeledContent("Alumni", value: String(store.members.filter { $0.effectiveKind() == .alumni }.count))
@@ -276,7 +331,14 @@ private struct CurrentClubView: View {
                         Label("Invite a friend", systemImage: "person.badge.plus")
                     }.accessibilityIdentifier("share-club-invite")
                 }
-            }
+                if !store.isPreview {
+                    ShareLink(item: store.inviteURL.appending(queryItems: [.init(name: "alumni", value: "1")]),
+                              subject: Text("Join " + store.club.name),
+                              message: Text("Request alumni membership in " + store.club.name + " on Club Connect.")) {
+                        Label("Share alumni signup", systemImage: "graduationcap")
+                    }
+                }
+            }.listRowBackground(theme.surface)
         }
         .brandListBackground()
         .refreshable { await store.refresh() }
@@ -306,6 +368,7 @@ private struct ClubEventRow: View {
 }
 
 private struct StepDownView: View {
+    @Environment(\.brandTheme) private var theme
     @Environment(ClubStore.self) private var store
     @Environment(\.dismiss) private var dismiss
     @State private var successor: String?
@@ -320,9 +383,9 @@ private struct StepDownView: View {
                         Text("An existing organizer").tag(nil as String?)
                         ForEach(store.members.filter { $0.id != store.me.id }) { m in Text(m.name).tag(Optional(m.id)) }
                     }
-                } footer: { Text("You’ll stay a member. If you’re the last organizer, choose another member to take over.") }
-                if let problem { Text(problem).foregroundStyle(.red) }
-                Button("Step down", role: .destructive) { confirming = true }.disabled(saving)
+                } footer: { Text("You’ll stay a member. If you’re the last organizer, choose another member with a verified USC address to take over.") }.listRowBackground(theme.surface)
+                if let problem { Text(problem).foregroundStyle(.red).listRowBackground(theme.surface) }
+                Button("Step down", role: .destructive) { confirming = true }.disabled(saving).listRowBackground(theme.surface)
             }
             .brandListBackground()
             .navigationTitle("Organizer handoff").navigationBarTitleDisplayMode(.inline)
@@ -423,6 +486,7 @@ private struct ClubPattern: Shape {
 }
 
 private struct ClubEditor: View {
+    @Environment(\.brandTheme) private var theme
     @Environment(ClubStore.self) private var store
     @Environment(\.dismiss) private var dismiss
     @State private var draft: Club
@@ -448,19 +512,19 @@ private struct ClubEditor: View {
                     }
                     TextField("Full name", text: $draft.fullName, axis: .vertical)
                         .textInputAutocapitalization(.words)
-                }
+                }.listRowBackground(theme.surface)
                 Section("Club palette") {
                     palettePicker("Primary color", hex: draft.accentHex, color: draft.brandColor) { draft.accentHex = $0 }
                     palettePicker("Secondary color", hex: draft.effectiveSecondaryHex, color: draft.secondaryBrandColor) { draft.secondaryHex = $0 }
-                }
+                }.listRowBackground(theme.surface)
                 Section("About the club") {
                     TextField("Describe your club", text: $draft.about, axis: .vertical)
                         .lineLimit(3...10)
-                }
+                }.listRowBackground(theme.surface)
                 Section("Preview") {
                     ClubIdentity(club: draft)
                         .listRowInsets(EdgeInsets())
-                }
+                }.listRowBackground(theme.surface)
             }
             .brandListBackground()
             .navigationTitle("Edit club")

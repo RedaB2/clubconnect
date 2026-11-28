@@ -19,6 +19,7 @@ private struct Invitation: Equatable {
     var event: String?
     var clubID: String
     var sample: Bool
+    var alumni: Bool
     init?(_ url: URL) {
         guard url.scheme == "clubconnect", let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
         let path = url.lastPathComponent
@@ -33,6 +34,12 @@ private struct Invitation: Equatable {
         guard clubID == "menasa" || UUID(uuidString: clubID) != nil else { return nil }
         clubID = clubID.lowercased()
         sample = components.queryItems?.contains(.init(name: "sample", value: "1")) ?? false
+        alumni = url.host == "join" && !sample && components.queryItems?.contains(.init(name: "alumni", value: "1")) == true
+    }
+
+    var savedLink: String {
+        if let event { return "clubconnect://event/\(event)?club=\(clubID)" + (sample ? "&sample=1" : "") }
+        return "clubconnect://join/\(clubID)" + (alumni ? "?alumni=1" : sample ? "?sample=1" : "")
     }
 }
 
@@ -42,19 +49,30 @@ private struct AppRoot: View {
     @Environment(ClubStore.self) private var store
     @Environment(\.scenePhase) private var scenePhase
     @State private var tab = Destination.events
-    @State private var route: Invitation?
+    // Email verification may relaunch the app. Persist only the validated club/event route.
+    @AppStorage("clubconnect.incoming-link") private var pendingLink = ""
+    private var route: Invitation? { URL(string: pendingLink).flatMap(Invitation.init) }
+    @State private var awaitingFirstMembership = false
     @State private var linkedEvent: EventLink?
     @State private var linkedClubID: String?
     @State private var eventsListID = UUID()
     @State private var switchCommunity = false
     @State private var joinInvitation: ClubListing?
+    @State private var alumniRequestTarget: ClubListing?
+    @State private var linkedApplicationID: String?
+    @State private var presentedApplicationLink: String?
 
     var body: some View {
         Group {
             switch store.phase {
             case .loading: ProgressView("Opening Club Connect…")
-            case .welcome: WelcomeView(sampleInvitation: route?.sample == true)
+            case .welcome:
+                WelcomeView(sampleInvitation: route?.sample == true, alumniInvitation: route?.alumni == true,
+                            invitedClubName: route.flatMap { link in
+                                store.catalog.first { $0.id == link.clubID }?.club.name ?? (link.clubID == "menasa" ? "MENASA" : nil)
+                            })
             case .enrollment: EnrollmentView()
+            case .alumniClubs: AlumniMembershipView(linkedClub: $linkedApplicationID)
             case .community: tabs
             case .reconnect:
                 ContentUnavailableView {
@@ -69,7 +87,17 @@ private struct AppRoot: View {
         }
         .task { await store.start(); followLink() }
         .onChange(of: store.phase) { _, phase in
-            if phase != .community { tab = .events; linkedEvent = nil; linkedClubID = nil }
+            if phase == .enrollment || phase == .alumniClubs { awaitingFirstMembership = true }
+            if phase == .welcome { awaitingFirstMembership = false; linkedApplicationID = nil }
+            if phase != .community {
+                tab = .events; linkedEvent = nil; linkedClubID = nil; alumniRequestTarget = nil; joinInvitation = nil
+            } else if awaitingFirstMembership {
+                awaitingFirstMembership = false
+                if route == nil {
+                    linkedClubID = store.club.id
+                    tab = .club
+                }
+            }
             followLink()
         }
         .onChange(of: scenePhase) { _, phase in
@@ -84,8 +112,16 @@ private struct AppRoot: View {
                 return
             }
             guard let link = Invitation(url) else { return }
-            route = link
-            Task { await store.refresh(); followLink() }
+            pendingLink = link.savedLink
+            presentedApplicationLink = nil
+            Task {
+                if store.phase == .alumniClubs && !store.catalog.contains(where: { $0.id == link.clubID }) {
+                    await store.loadMembership()
+                } else if store.phase == .community {
+                    await store.refresh()
+                }
+                followLink()
+            }
         }
         .sheet(item: $linkedEvent) { item in
             NavigationStack {
@@ -101,7 +137,10 @@ private struct AppRoot: View {
                     else { store.openSample(); followLink() }
                 }
             }
-            Button("Cancel", role: .cancel) { route = nil }
+            Button("Cancel", role: .cancel) { pendingLink = "" }
+        }
+        .sheet(item: $alumniRequestTarget) { target in
+            AlumniApplicationSheet(club: target.club) {}
         }
         .alert("Join " + (joinInvitation?.club.name ?? "club") + "?", isPresented: Binding(
             get: { joinInvitation != nil }, set: { if !$0 { joinInvitation = nil } }
@@ -109,10 +148,10 @@ private struct AppRoot: View {
             Button("Join club") {
                 Task {
                     do { try await store.joinAdditionalClub(listing.id); followLink() }
-                    catch { route = nil; store.notice = error.localizedDescription }
+                    catch { pendingLink = ""; store.notice = error.localizedDescription }
                 }
             }
-            Button("Cancel", role: .cancel) { route = nil }
+            Button("Cancel", role: .cancel) { pendingLink = "" }
         } message: { _ in Text("Joining makes your profile visible to the other members.") }
         .alert("Club Connect", isPresented: Binding(get: { store.notice != nil }, set: { if !$0 { store.notice = nil } })) {
             Button("OK") { store.notice = nil }
@@ -156,8 +195,23 @@ private struct AppRoot: View {
 
     private func followLink() {
         guard let route else { return }
+        if store.phase == .alumniClubs, !route.sample {
+            if store.catalog.contains(where: { $0.id == route.clubID }) {
+                store.enrollmentClubID = route.clubID
+                if presentedApplicationLink != route.savedLink {
+                    linkedApplicationID = route.clubID
+                    presentedApplicationLink = route.savedLink
+                }
+            } else {
+                pendingLink = ""
+                store.notice = "This club is unavailable."
+            }
+            // A club link selects a club to apply to. It is never a membership credential.
+            if route.event == nil { pendingLink = "" }
+            return
+        }
         if store.phase == .enrollment, !store.completingProfile,
-           store.catalog.contains(where: { $0.id == route.clubID && $0.canJoin }) {
+           store.catalog.contains(where: { $0.id == route.clubID && ($0.canJoin || store.isAlumniAccount) }) {
             store.enrollmentClubID = route.clubID
         }
         guard store.phase == .community else { return }
@@ -167,21 +221,29 @@ private struct AppRoot: View {
         }
         if route.clubID != store.club.id {
             guard let target = store.catalog.first(where: { $0.id == route.clubID }) else {
-                self.route = nil
+                pendingLink = ""
                 store.notice = "This club is unavailable."
                 return
             }
             if !target.joined {
-                joinInvitation = target
+                if store.isAlumniAccount {
+                    pendingLink = ""
+                    alumniRequestTarget = target
+                } else if target.canJoin {
+                    joinInvitation = target
+                } else {
+                    pendingLink = ""
+                    store.notice = "This club is unavailable."
+                }
                 return
             }
             Task {
                 do { try await store.selectClub(target.id); followLink() }
-                catch { self.route = nil; store.notice = error.localizedDescription }
+                catch { pendingLink = ""; store.notice = error.localizedDescription }
             }
             return
         }
-        self.route = nil
+        pendingLink = ""
         if let id = route.event {
             tab = .events
             linkedEvent = EventLink(id: id)

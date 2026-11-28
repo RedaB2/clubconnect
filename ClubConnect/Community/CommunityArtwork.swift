@@ -22,7 +22,10 @@ struct MemberPortrait: View {
                 Image(uiImage: image).resizable().scaledToFill()
             } else {
                 ZStack {
+                    // A stable tint distinguishes initials even after an app relaunch.
+                    let variant = name.utf8.reduce(0) { ($0 + Int($1)) % 5 }
                     Circle().fill(theme.wash)
+                    Circle().fill(theme.accent.opacity(Double(variant) * 0.045))
                     if initials.isEmpty {
                         Image(systemName: "person.fill")
                             .font(.system(size: diameter * 0.38))

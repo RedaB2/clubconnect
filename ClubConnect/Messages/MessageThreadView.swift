@@ -4,7 +4,11 @@ struct MessageThreadView: View {
     @Environment(\.brandTheme) private var theme
     @Environment(ClubStore.self) private var store
     @Environment(\.scenePhase) private var scene
+    @Environment(\.horizontalSizeClass) private var width
+    @Environment(\.dynamicTypeSize) private var typeSize
     let member: Member
+    var refreshInbox: (() async -> Void)? = nil
+    @State private var showingProfile = false
     @State private var messages: [DirectMessage] = []
     @State private var queue: [DirectMessage] = []
     @State private var draft = ""
@@ -19,21 +23,28 @@ struct MessageThreadView: View {
     var body: some View {
         ScrollViewReader { reader in
             ScrollView {
-                LazyVStack(spacing: 9) {
+                let transcript = rows
+                LazyVStack(spacing: 12) {
                     if older { Button("Load earlier messages") { Task { await loadOlder() } }.padding(8) }
-                    if loading && rows.isEmpty { ProgressView().accessibilityLabel("Loading conversation") }
-                    else if rows.isEmpty && problem == nil {
-                        ContentUnavailableView("Start the conversation", systemImage: "bubble.left",
-                            description: Text("Send a private message to \(member.name)."))
+                    if loading && transcript.isEmpty { ProgressView().accessibilityLabel("Loading conversation") }
+                    else if transcript.isEmpty && problem == nil {
+                        ContentUnavailableView {
+                            MemberPortrait(name: member.name, imageData: member.photoData, diameter: 72)
+                            Text("Start the conversation")
+                        } description: {
+                            Text("Send a private message to \(member.name).")
+                        }
                     }
-                    ForEach(Array(rows.enumerated()), id: \.element.id) { index, message in
-                        if index == 0 || !Calendar.current.isDate(message.sentAt, inSameDayAs: rows[index-1].sentAt) {
-                            Text(message.sentAt.formatted(date: .abbreviated, time: .omitted))
-                                .font(.caption.weight(.semibold)).foregroundStyle(.secondary).padding(.vertical, 5)
+                    ForEach(Array(transcript.enumerated()), id: \.element.id) { index, message in
+                        if index == 0 || !Calendar.current.isDate(message.sentAt, inSameDayAs: transcript[index - 1].sentAt) {
+                            dayDivider(message.sentAt)
                         }
                         bubble(message).id(message.id)
                     }
-                }.padding(.horizontal).padding(.vertical, 10)
+                }
+                .padding(.horizontal, 18).padding(.vertical, 18)
+                .frame(maxWidth: 710)
+                .frame(maxWidth: .infinity)
             }
             .scrollDismissesKeyboard(.interactively)
             .background(theme.canvas)
@@ -41,34 +52,32 @@ struct MessageThreadView: View {
                 if let id { reader.scrollTo(id, anchor: .bottom) }
             }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            VStack(alignment: .leading, spacing: 6) {
-                if let problem {
-                    HStack {
-                        Text(problem).font(.footnote)
-                        Spacer()
-                        Button("Retry") { Task { await refresh() } }
-                    }
-                }
-                HStack(alignment: .bottom, spacing: 8) {
-                    TextField("Message", text: $draft, axis: .vertical)
-                        .lineLimit(1...5).textFieldStyle(.roundedBorder).focused($composing)
-                        .accessibilityLabel("Message to \(member.name)")
-                    Button { Task { await send() } } label: {
-                        Image(systemName: "arrow.up.circle.fill").font(.title).frame(width: 44, height: 44)
-                    }
-                    .accessibilityLabel("Send message")
-                    .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || draft.unicodeScalars.count > 4000)
-                }
-                if draft.unicodeScalars.count > 4000 { Text("Messages can contain up to 4,000 characters.").font(.caption) }
-            }.padding(.horizontal).padding(.vertical, 8).background(.bar)
-        }
+        .safeAreaInset(edge: .bottom, spacing: 0) { composer }
         .navigationTitle(member.name)
+        .modifier(ThreadClubSubtitle(clubName: store.club.name))
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(width == .compact ? .hidden : .automatic, for: .tabBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { showingProfile = true } label: {
+                    MemberPortrait(name: member.name, imageData: member.photoData, diameter: 32)
+                        .frame(minWidth: 44, minHeight: 44)
+                }
+                .accessibilityLabel("View profile of " + member.name)
+            }
+        }
+        .sheet(isPresented: $showingProfile) {
+            NavigationStack {
+                MemberProfile(member: store.members.first { $0.id == member.id } ?? member)
+                    .navigationTitle("Member profile").navigationBarTitleDisplayMode(.inline)
+                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showingProfile = false } } }
+            }
+        }
         .task(id: "\(store.club.id)/\(store.me.id)/\(member.id)/\(scene == .active)") {
             guard scene == .active else { return }
             await MessageLiveUpdates(store: store).listen {
                 await refresh()
+                await refreshInbox?()
                 return problem == nil && queue.isEmpty
             }
         }
@@ -79,23 +88,84 @@ struct MessageThreadView: View {
         return messages + queue.filter { !confirmed.contains($0.id) }
     }
 
+    private var canSend: Bool {
+        !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && draft.unicodeScalars.count <= 4000
+    }
+
+    private var composer: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let problem {
+                HStack {
+                    Text(problem).font(.footnote)
+                    Spacer()
+                    Button("Retry") { Task { await refresh() } }
+                }
+            }
+            HStack(alignment: .bottom, spacing: 3) {
+                TextField("Message", text: $draft, prompt: Text("Message").foregroundStyle(theme.ink.opacity(0.63)), axis: .vertical)
+                    .lineLimit(1...5).textFieldStyle(.plain).focused($composing)
+                    .foregroundStyle(theme.ink)
+                    .padding(.leading, 16).padding(.vertical, 12)
+                    .accessibilityLabel("Message to \(member.name)")
+                Button { Task { await send() } } label: {
+                    Image(systemName: "arrow.up")
+                        .font(.body.weight(.bold))
+                        .foregroundStyle(canSend ? BrandTheme.label(on: theme.accent) : theme.ink.opacity(0.5))
+                        .frame(width: 34, height: 34)
+                        .background(canSend ? theme.accent : theme.wash, in: Circle())
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Send message")
+                .disabled(!canSend)
+            }
+            .padding(2)
+            .background(theme.surface, in: .rect(cornerRadius: 25))
+            .overlay {
+                RoundedRectangle(cornerRadius: 25).strokeBorder(theme.ink.opacity(0.2), lineWidth: 1)
+                    .allowsHitTesting(false)
+            }
+            if draft.unicodeScalars.count > 4000 { Text("Messages can contain up to 4,000 characters.").font(.caption) }
+        }
+        .frame(maxWidth: 710)
+        .padding(.horizontal, 14).padding(.vertical, 7)
+        .frame(maxWidth: .infinity)
+        .background(theme.canvas)
+    }
+
+    private func dayDivider(_ date: Date) -> some View {
+        HStack(spacing: 10) {
+            Rectangle().fill(theme.ink.opacity(0.16)).frame(height: 1)
+            Text(date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().year()))
+                .font(.caption.weight(.semibold)).foregroundStyle(theme.ink.opacity(0.72))
+                .fixedSize(horizontal: false, vertical: true)
+                .layoutPriority(1)
+            Rectangle().fill(theme.ink.opacity(0.16)).frame(height: 1)
+        }
+        .padding(.vertical, 4)
+        .accessibilityAddTraits(.isHeader)
+    }
+
     private func bubble(_ message: DirectMessage) -> some View {
         let mine = message.sender == store.me.id
         let waiting = queue.contains { $0.id == message.id }
+        let status = waiting ? "Queued" : (mine && message.id == messages.last?.id ? (message.readAt == nil ? "Sent" : "Read") : "")
+        let bubbleShape = UnevenRoundedRectangle(topLeadingRadius: 19, bottomLeadingRadius: mine ? 19 : 5,
+            bottomTrailingRadius: mine ? 5 : 19, topTrailingRadius: 19)
+        let margin: CGFloat = typeSize.isAccessibilitySize ? 12 : 46
         return HStack {
-            if mine { Spacer(minLength: 35) }
-            VStack(alignment: mine ? .trailing : .leading, spacing: 3) {
+            if mine { Spacer(minLength: margin) }
+            VStack(alignment: mine ? .trailing : .leading, spacing: 4) {
                 Text(message.body).textSelection(.enabled)
-                    .padding(.horizontal, 13).padding(.vertical, 8)
-                    .background(mine ? theme.wash : theme.surface,
-                                in: RoundedRectangle(cornerRadius: 16))
+                    .foregroundStyle(mine ? BrandTheme.label(on: theme.accent) : theme.ink)
+                    .padding(.horizontal, 14).padding(.vertical, 10)
+                    .background(mine ? theme.accent : theme.surface, in: bubbleShape)
                 HStack(spacing: 5) {
                     Text(message.sentAt.formatted(date: .omitted, time: .shortened))
-                    if waiting { Text("Queued") }
-                    else if mine && message.id == messages.last?.id { Text(message.readAt == nil ? "Sent" : "Read") }
-                }.font(.caption2).foregroundStyle(.secondary)
+                    if !status.isEmpty { Text(status) }
+                }.font(.caption).foregroundStyle(theme.ink.opacity(0.73))
             }
-            if !mine { Spacer(minLength: 35) }
+            if !mine { Spacer(minLength: margin) }
         }
             .contextMenu {
                 if waiting && !updating && problem != nil {
@@ -109,7 +179,7 @@ struct MessageThreadView: View {
                 }
             }
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("\(mine ? "You" : member.name), \(message.body), \(message.sentAt.formatted()), \(waiting ? "Queued" : "")")
+            .accessibilityLabel("\(mine ? "You" : member.name), \(message.body), \(message.sentAt.formatted()), \(status)")
     }
 
     private func send() async {
@@ -121,6 +191,7 @@ struct MessageThreadView: View {
             queue = try mailbox.pending(member.id)
             scrollTarget = queue.last?.id
             await refresh()
+            await refreshInbox?()
         } catch { problem = error.localizedDescription }
     }
 
@@ -173,5 +244,16 @@ struct MessageThreadView: View {
             older = page.count == 40
             scrollTarget = first.id
         } catch { problem = error.localizedDescription }
+    }
+}
+
+
+private struct ThreadClubSubtitle: ViewModifier {
+    let clubName: String
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 26, *) { content.navigationSubtitle(Text(clubName)) }
+        else { content }
     }
 }

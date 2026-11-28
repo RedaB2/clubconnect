@@ -17,18 +17,24 @@ final class PilotAuth {
 
     var hasSession: Bool { session != nil }
 
+    var isAlumniAccount: Bool {
+        session.map { !$0.email.hasSuffix("@usc.edu") } ?? false
+    }
+
     static func normalizedEmail(_ raw: String) -> String? {
         let email = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let parts = email.split(separator: "@", omittingEmptySubsequences: false)
-        guard parts.count == 2, !parts[0].isEmpty, parts[1] == "usc.edu",
-              email.count <= 254, !email.contains(where: { $0.isWhitespace }) else { return nil }
+        // Match the single-mailbox syntax accepted by the signup service.
+        let pattern = #"^[-a-z0-9_+']+(\.[-a-z0-9_+']+)*@[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?(\.[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?)+$"#
+        guard email.utf8.count <= 254,
+              let at = email.firstIndex(of: "@"), email[..<at].utf8.count <= 64,
+              email.range(of: pattern, options: .regularExpression) == email.startIndex..<email.endIndex else { return nil }
         return email
     }
 
     private static let redirect = "clubconnect://auth/callback"
 
     func requestCode(email raw: String) async throws {
-        guard let email = Self.normalizedEmail(raw) else { throw ClubFailure("Enter your USC email address ending in @usc.edu.") }
+        guard let email = Self.normalizedEmail(raw) else { throw ClubFailure("Enter a valid email address.") }
         let bytes = (0..<32).map { _ in UInt8.random(in: .min ... .max) }
         let verifier = bytes.map { String(format: "%02x", $0) }.joined()
         let challenge = Data(SHA256.hash(data: Data(verifier.utf8))).base64EncodedString()
@@ -55,7 +61,7 @@ final class PilotAuth {
 
     func verifyCode(email raw: String, code: String) async throws {
         guard let email = Self.normalizedEmail(raw), code.count == 6,
-              code.utf8.allSatisfy({ (48...57).contains($0) }) else { throw ClubFailure("Enter the six-digit code from your USC email.") }
+              code.utf8.allSatisfy({ (48...57).contains($0) }) else { throw ClubFailure("Enter the six-digit code from your sign-in email.") }
         let attempt = beginSessionChange()
         let reply = try await request(path: "verify", query: [:], body: ["type": "email", "email": email, "token": code])
         try persist(reply, for: attempt, expectedEmail: email)
@@ -89,7 +95,7 @@ final class PilotAuth {
             do {
                 let reply = try await request(path: "token", query: ["grant_type": "refresh_token"],
                                               body: ["refresh_token": session.refreshToken])
-                return try persist(reply, for: attempt, expectedEmail: session.uscEmail).accessToken
+                return try persist(reply, for: attempt, expectedEmail: session.email).accessToken
             } catch let failure as AuthResponseError where failure.sessionHasEnded {
                 if generation == attempt {
                     try Keychain.remove()
@@ -131,10 +137,10 @@ final class PilotAuth {
         }
         guard let email = Self.normalizedEmail(response.user.email), email == expectedEmail,
               response.user.email_confirmed_at != nil, response.user.app_metadata.provider == "email" else {
-            throw ClubFailure("Sign in with your verified USC email address.")
+            throw ClubFailure("Verify the same email address you used to sign in.")
         }
         let updated = Session(accessToken: response.access_token, refreshToken: response.refresh_token,
-                              expiresAt: Date().addingTimeInterval(response.expires_in), uscEmail: email)
+                              expiresAt: Date().addingTimeInterval(response.expires_in), email: email)
         try Keychain.save(JSONEncoder().encode(updated))
         session = updated
         return updated
@@ -165,7 +171,13 @@ final class PilotAuth {
         let accessToken: String
         let refreshToken: String
         let expiresAt: Date
-        let uscEmail: String
+        let email: String
+
+        // Retain the existing Keychain format across the alumni rollout.
+        enum CodingKeys: String, CodingKey {
+            case accessToken, refreshToken, expiresAt
+            case email = "uscEmail"
+        }
     }
 
     private struct PendingSignIn: Codable {

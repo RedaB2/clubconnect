@@ -81,6 +81,12 @@ struct MessageMailbox {
             .appending(path: key((sample ? "sample/" : "live/") + id))
     }
 
+    #if DEBUG
+    static func resetSampleForTesting(_ id: String) {
+        try? FileManager.default.removeItem(at: accountLocation(id, sample: true))
+    }
+    #endif
+
     static func clearAccount(_ id: String) {
         try? FileManager.default.removeItem(at: accountLocation(id, sample: false))
         try? FileManager.default.removeItem(at: accountLocation(id, sample: true))

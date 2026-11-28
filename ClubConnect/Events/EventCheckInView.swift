@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct EventCheckInView: View {
+    @Environment(\.brandTheme) private var theme
     @Environment(ClubStore.self) private var store
     @Environment(\.dismiss) private var dismiss
     @State private var manualCode = ""
@@ -17,13 +18,13 @@ struct EventCheckInView: View {
                     Text(event.title).font(.system(.title2, design: .serif, weight: .semibold))
                     Label(event.location, systemImage: "mappin")
                         .font(.subheadline).foregroundStyle(.secondary)
-                }
+                }.listRowBackground(theme.surface)
                 Section {
                     Button { scanning = true } label: {
                         Label("Scan ticket", systemImage: "qrcode.viewfinder")
                     }
                     .disabled(submitting)
-                }
+                }.listRowBackground(theme.surface)
                 Section("Enter a ticket code") {
                     TextField("Ticket code", text: $manualCode)
                         .textContentType(.none)
@@ -40,12 +41,12 @@ struct EventCheckInView: View {
                         }
                     }
                     .disabled(submitting || manualCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
+                }.listRowBackground(theme.surface)
                 if let result {
                     Section {
                         Label(result.text, systemImage: result.success ? "checkmark.circle.fill" : "exclamationmark.circle")
                             .accessibilityAddTraits(.isStaticText)
-                    }
+                    }.listRowBackground(theme.surface)
                 }
             }
             .disabled(!store.isAdmin)

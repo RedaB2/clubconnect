@@ -219,7 +219,7 @@ Deno.serve(async (request) => {
     if (
       !response.ok &&
       (await response.clone().json().catch(() => ({}))).code === "28000"
-    ) return fail("Verify your USC email to add a pass.", 403);
+    ) return fail("Verify your email to add a pass.", 403);
     if (!response.ok) return fail("Tickets are temporarily unavailable.", 503);
     if (sample) {
       return samplePass(

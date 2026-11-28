@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct MyProfileView: View {
+    @Environment(\.brandTheme) private var theme
     @Environment(ClubStore.self) private var store
     @State private var editing = false
     @State private var redeeming = false
@@ -14,10 +15,10 @@ struct MyProfileView: View {
                 if !store.me.hasCompleteAcademicProfile() {
                     Section {
                         Button("Complete graduation details") { editing = true }
-                    }
+                    }.listRowBackground(theme.surface)
                 }
                 Section {
-                    if !store.isPreview && !store.hasOrganizerRole {
+                    if !store.isPreview && !store.isAlumniAccount && !store.hasOrganizerRole {
                         Button { redeeming = true } label: {
                             Label("Redeem organizer invitation", systemImage: "envelope.badge.person.crop")
                         }
@@ -38,7 +39,7 @@ struct MyProfileView: View {
                                 Text("This permanently removes your Club Connect profile and event registrations.")
                             }
                     }
-                }
+                }.listRowBackground(theme.surface)
             }
             .navigationTitle("Profile")
             .toolbar {
@@ -68,6 +69,7 @@ struct MyProfileView: View {
 }
 
 private struct OrganizerInvitationView: View {
+    @Environment(\.brandTheme) private var theme
     @Environment(ClubStore.self) private var store
     @Environment(\.dismiss) private var dismiss
     @State private var code = ""
@@ -83,7 +85,7 @@ private struct OrganizerInvitationView: View {
                         .autocorrectionDisabled()
                 } footer: {
                     Text("Use the one-time code provided by your club to manage events and club settings.")
-                }
+                }.listRowBackground(theme.surface)
             }
             .brandListBackground()
             .navigationTitle("Organizer invitation")
@@ -135,17 +137,22 @@ struct MemberProfile<Footer: View>: View {
                             .accessibilityAddTraits(.isHeader)
                         Text(member.effectiveKind()?.communityTitle ?? "Graduation term needed")
                             .font(.subheadline.weight(.medium))
-                            .foregroundStyle(Color.primary.opacity(0.72))
+                            .foregroundStyle(theme.ink.opacity(0.76))
                     }
                 }
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 4)
+                .padding(.vertical, 24)
+                .padding(.horizontal, 12)
+                .background {
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .fill(LinearGradient(colors: [theme.wash, theme.surface], startPoint: .top, endPoint: .bottom))
+                }
             }
             .listRowBackground(Color.clear)
             .listRowInsets(.init(top: 4, leading: 0, bottom: 6, trailing: 0))
             if !member.bio.isEmpty {
-                Section("About") { Text(member.bio).textSelection(.enabled) }
+                Section("About") { Text(member.bio).textSelection(.enabled) }.listRowBackground(theme.surface)
             }
             if let graduation = member.graduationLabel {
                 Section("Education") {
@@ -153,20 +160,20 @@ struct MemberProfile<Footer: View>: View {
                     if member.effectiveKind() == .student, let standing = member.classStanding {
                         LabeledContent("Class standing", value: standing.title)
                     }
-                }
+                }.listRowBackground(theme.surface)
             }
             if !member.major.isEmpty {
-                Section("Major") { Label(member.major, systemImage: "graduationcap").labelStyle(CommunityFieldLabelStyle()) }
+                Section("Major") { Label(member.major, systemImage: "graduationcap").labelStyle(CommunityFieldLabelStyle()) }.listRowBackground(theme.surface)
             }
             if !member.interests.isEmpty {
                 Section("Interests") {
                     ForEach(Array(member.interests.enumerated()), id: \.offset) { _, interest in
                         Text(interest)
                     }
-                }
+                }.listRowBackground(theme.surface)
             }
             if !member.experience.isEmpty {
-                Section("Experience") { Text(member.experience).textSelection(.enabled) }
+                Section("Experience") { Text(member.experience).textSelection(.enabled) }.listRowBackground(theme.surface)
             }
             footer()
         }
@@ -188,7 +195,8 @@ private struct CommunityFieldLabelStyle: LabelStyle {
     }
 }
 
-private struct ProfileEditor: View {
+struct ProfileEditor: View {
+    @Environment(\.brandTheme) private var theme
     @Environment(ClubStore.self) private var store
     @Environment(\.dismiss) private var dismiss
     @State private var draft: Member
@@ -211,24 +219,24 @@ private struct ProfileEditor: View {
                         CommunityPhotoPicker(label: "Choose photo", removalLabel: "Remove photo", data: $draft.photoData, isLoading: $loadingImage)
                     }
                     .padding(.vertical, 5)
-                }
+                }.listRowBackground(theme.surface)
                 Section("Profile") {
                     TextField("Name", text: $draft.name).textContentType(.name)
                     TextField("Major", text: $draft.major)
                     TextField("About you", text: $draft.bio, axis: .vertical)
                         .lineLimit(2...6)
-                }
-                GraduationFields(term: $draft.graduationTerm, year: $draft.graduationYear, standing: $draft.classStanding)
+                }.listRowBackground(theme.surface)
+                GraduationFields(term: $draft.graduationTerm, year: $draft.graduationYear, standing: $draft.classStanding, alumniOnly: store.isAlumniAccount)
                 Section {
                     TextField("Interests", text: $interests, axis: .vertical)
                         .lineLimit(1...4)
                 } footer: {
                     Text("Separate your interests with commas.")
-                }
+                }.listRowBackground(theme.surface)
                 Section("Experience") {
                     TextField("Work, projects, or campus involvement", text: $draft.experience, axis: .vertical)
                         .lineLimit(3...8)
-                }
+                }.listRowBackground(theme.surface)
             }
             .brandListBackground()
             .navigationTitle("Edit profile")
@@ -239,7 +247,7 @@ private struct ProfileEditor: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }
                         .disabled(saving || loadingImage || draft.name.communityTrimmed.isEmpty ||
-                                  !draft.hasCompleteAcademicProfile() || !GraduationTerm.validYears.contains(draft.graduationYear ?? 0))
+                                  !draft.hasCompleteAcademicProfile() || (store.isAlumniAccount && draft.effectiveKind() != .alumni) || !GraduationTerm.validYears.contains(draft.graduationYear ?? 0))
                 }
             }
             .interactiveDismissDisabled(saving)
@@ -251,6 +259,7 @@ private struct ProfileEditor: View {
 
     private func save() {
         guard !saving, let kind = draft.effectiveKind(), draft.hasCompleteAcademicProfile(),
+              !store.isAlumniAccount || kind == .alumni,
               GraduationTerm.validYears.contains(draft.graduationYear ?? 0) else { return }
         var update = draft
         update.kind = kind
@@ -266,7 +275,11 @@ private struct ProfileEditor: View {
         saving = true
         Task {
             do {
-                try await store.saveProfile(update)
+                if store.phase == .alumniClubs {
+                    try await store.saveAlumniProfile(update)
+                } else {
+                    try await store.saveProfile(update)
+                }
                 dismiss()
             } catch { problem = error.localizedDescription }
             saving = false
@@ -275,9 +288,11 @@ private struct ProfileEditor: View {
 }
 
 struct GraduationFields: View {
+    @Environment(\.brandTheme) private var theme
     @Binding var term: GraduationTerm?
     @Binding var year: Int?
     @Binding var standing: ClassStanding?
+    var alumniOnly = false
 
     private var kind: MemberKind? {
         guard let term, let year, GraduationTerm.validYears.contains(year) else { return nil }
@@ -301,7 +316,7 @@ struct GraduationFields: View {
             }
             if let kind {
                 LabeledContent("Membership", value: kind.communityTitle)
-                if kind == .student {
+                if kind == .student && !alumniOnly {
                     Picker("Class standing", selection: $standing) {
                         Text("Choose standing").tag(nil as ClassStanding?)
                         ForEach(ClassStanding.allCases, id: \.self) { standing in
@@ -315,9 +330,11 @@ struct GraduationFields: View {
         } footer: {
             if let year, !GraduationTerm.validYears.contains(year) {
                 Text("Enter a year from \(GraduationTerm.validYears.lowerBound.formatted(.number.grouping(.never))) through \(GraduationTerm.validYears.upperBound.formatted(.number.grouping(.never))).")
+            } else if alumniOnly {
+                Text("Choose a graduation term that has already ended.")
             } else {
                 Text(GraduationTerm.cutoffDescription)
             }
-        }
+        }.listRowBackground(theme.surface)
     }
 }

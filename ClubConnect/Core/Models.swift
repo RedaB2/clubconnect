@@ -118,7 +118,13 @@ struct CommunityState: Codable {
             Member(id: "demo-omar", name: "Omar Benali", kind: .student, major: "Film Studies", interests: ["Cinema", "Photography"], bio: "Planning our next film night.", graduationTerm: .fall, graduationYear: campusYear + 1, classStanding: .senior),
             Member(id: "demo-lina", name: "Lina Khoury", kind: .student, major: "Public Health", interests: ["Food", "Community gardens"], graduationTerm: .spring, graduationYear: campusYear + 3, classStanding: .sophomore),
             Member(id: "demo-samir", name: "Samir Osman", kind: .alumni, major: "Mechanical Engineering", interests: ["Robotics", "Cycling"], experience: "Product design engineer", graduationTerm: .fall, graduationYear: campusYear - 4)
-        ]
+        ].map { member in
+            var sample = member
+            if let url = Bundle.main.url(forResource: member.id, withExtension: "jpg") {
+                sample.photoData = try? Data(contentsOf: url)
+            }
+            return sample
+        }
         let calendar = Calendar.current
         func event(_ id: String, _ days: Int, _ hour: Int, _ title: String, _ summary: String, _ place: String, _ category: String) -> ClubEvent {
             let day = calendar.date(byAdding: .day, value: days, to: now) ?? now

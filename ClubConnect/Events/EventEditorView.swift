@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct EventEditorView: View {
+    @Environment(\.brandTheme) private var theme
     @Environment(ClubStore.self) private var store
     @Environment(\.dismiss) private var dismiss
     @State private var draft: ClubEvent
@@ -29,7 +30,7 @@ struct EventEditorView: View {
                         .accessibilityLabel("Location")
                     TextField("Category", text: $draft.category)
                         .accessibilityLabel("Category")
-                }
+                }.listRowBackground(theme.surface)
                 Section("When") {
                     DatePicker("Starts", selection: $draft.startsAt)
                         .onChange(of: draft.startsAt) { oldStart, newStart in
@@ -41,16 +42,16 @@ struct EventEditorView: View {
                     if draft.endsAt <= draft.startsAt {
                         Text("Choose an end time after the start.").foregroundStyle(.secondary)
                     }
-                }
+                }.listRowBackground(theme.surface)
                 Section("About this event") {
                     TextField("What should members know?", text: $draft.summary, axis: .vertical)
                         .lineLimit(3...9)
                         .accessibilityLabel("Event description")
-                }
+                }.listRowBackground(theme.surface)
                 if let fieldProblem {
                     Section {
                         Label(fieldProblem, systemImage: "exclamationmark.circle")
-                    }
+                    }.listRowBackground(theme.surface)
                 }
             }
             .disabled(saving)

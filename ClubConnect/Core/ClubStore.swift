@@ -3,19 +3,22 @@ import Observation
 
 @MainActor @Observable
 final class ClubStore {
-    enum Phase { case loading, welcome, enrollment, community, reconnect }
+    enum Phase { case loading, welcome, enrollment, alumniClubs, community, reconnect }
     private(set) var phase = Phase.loading
     private(set) var isPreview = false
     private var state = CommunityState.sample()
     var notice: String?
     var showAccountDeleted = false
     var suggestedName = ""
+    private(set) var alumniProfile: Member?
+    private(set) var alumniApplications: [AlumniApplication] = []
     private(set) var catalog: [ClubListing] = []
     var enrollmentClubID = "menasa"
     private(set) var completingProfile = false
     private(set) var viewingAsMember = false
     private var sampleClubs: SampleClubs?
     private let auth = PilotAuth()
+    private var accessGeneration = UUID()
     @ObservationIgnored private var pending: Task<Void, Never>?
     @ObservationIgnored private let defaults = UserDefaults.standard
     private let demoKey = "clubconnect.sample.v1"
@@ -28,6 +31,7 @@ final class ClubStore {
     var enrollmentClubName: String { catalog.first { $0.id == enrollmentClubID }?.club.name ?? "MENASA" }
     var hasOrganizerRole: Bool { state.isAdmin }
     var hasCampusSession: Bool { auth.hasSession }
+    var isAlumniAccount: Bool { auth.isAlumniAccount }
     var club: Club { state.club }
     var members: [Member] { state.members }
     var me: Member { members.first { $0.id == state.myID } ?? Member(id: state.myID, name: "Member", kind: .student) }
@@ -47,12 +51,16 @@ final class ClubStore {
     func start() async {
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("-ClubConnectFreshDemo") {
-            defaults.removeObject(forKey: demoKey)
-            defaults.removeObject(forKey: libraryKey)
+            if campusAccountID == nil {
+                MessageMailbox.resetSampleForTesting(sampleOwnerID)
+                defaults.removeObject(forKey: demoKey)
+                defaults.removeObject(forKey: libraryKey)
+            }
+            defaults.removeObject(forKey: "clubconnect.incoming-link")
             for key in defaults.dictionaryRepresentation().keys where key.hasPrefix("clubconnect.member-view.demo-organizer.") {
                 defaults.removeObject(forKey: key)
             }
-            defaults.removeObject(forKey: modeKey)
+            if !auth.hasSession { defaults.removeObject(forKey: modeKey) }
             phase = .welcome
             return
         }
@@ -69,6 +77,8 @@ final class ClubStore {
         #if !DEBUG
         guard auth.hasSession, phase == .community else { return }
         #endif
+        guard !isAlumniAccount else { return }
+        accessGeneration = UUID()
         let saved = defaults.data(forKey: libraryKey).flatMap { try? JSONDecoder().decode(SampleClubs.self, from: $0) }
         let old = (campusAccountID == nil ? defaults.data(forKey: demoKey) : nil).flatMap { try? JSONDecoder().decode(CommunityState.self, from: $0) }
         let pilot = old ?? .sample()
@@ -94,12 +104,14 @@ final class ClubStore {
     }
 
     private func enterVerifiedSession() async {
+        accessGeneration = UUID()
         isPreview = false
         defaults.removeObject(forKey: modeKey)
         await loadMembership()
     }
 
     func loadMembership() async {
+        let generation = accessGeneration
         phase = .loading
         do {
             try await reloadCatalog()
@@ -108,7 +120,7 @@ final class ClubStore {
             guard let selected = joined.first(where: { $0.id == remembered }) ?? joined.first else {
                 if !catalog.contains(where: { $0.id == enrollmentClubID }) { enrollmentClubID = catalog.first?.id ?? "menasa" }
                 completingProfile = false
-                phase = .enrollment
+                phase = isAlumniAccount && alumniProfile != nil ? .alumniClubs : .enrollment
                 return
             }
             try await loadClub(selected.id)
@@ -117,6 +129,7 @@ final class ClubStore {
             suggestedName = me.name
             phase = completingProfile ? .enrollment : .community
         } catch {
+            guard generation == accessGeneration else { return }
             phase = auth.hasSession ? .reconnect : .welcome
             notice = error.localizedDescription
         }
@@ -154,7 +167,15 @@ final class ClubStore {
         phase = .community
     }
 
-    private func reloadCatalog() async throws {
+    func reloadCatalog() async throws {
+        if isAlumniAccount {
+            let data = try await rpc("alumni_workspace", body: Data("{}".utf8))
+            let workspace = try Self.alumniDecoder().decode(AlumniWorkspace.self, from: data)
+            alumniProfile = workspace.profile
+            alumniApplications = workspace.applications
+            catalog = workspace.catalog
+            return
+        }
         let data = try await rpc("club_catalog", body: Data("{}".utf8))
         catalog = try JSONDecoder().decode([ClubListing].self, from: data)
     }
@@ -169,7 +190,9 @@ final class ClubStore {
         if !isPreview { campusAccountID = fresh.myID }
         viewingAsMember = defaults.bool(forKey: roleViewKey)
         if !isPreview { defaults.set(id, forKey: activeKey) }
-        let entry = ClubListing(club: fresh.club, joined: true, isAdmin: fresh.isAdmin, canJoin: true)
+        let listing = (isPreview ? sampleClubs?.catalog : catalog)?.first { $0.id == id }
+        let entry = ClubListing(club: fresh.club, joined: true, isAdmin: fresh.isAdmin, canJoin: true,
+                                pendingRequestCount: fresh.isAdmin ? listing?.pendingRequestCount : nil)
         if let index = catalog.firstIndex(where: { $0.id == id }) { catalog[index] = entry }
         else { catalog.append(entry) }
     }
@@ -257,8 +280,18 @@ final class ClubStore {
             try await serialized {
                 guard self.phase == .community, !self.isPreview else { return }
                 try await self.reloadCatalog()
+                guard self.catalog.contains(where: { $0.id == self.club.id && $0.joined }) else {
+                    // Immediately gate the old club before choosing another membership.
+                    self.phase = .loading
+                    await self.loadMembership()
+                    return
+                }
                 try await self.loadClub(self.club.id)
             }
+        } catch is CancellationError {
+            return
+        } catch let error as ServerError where error.code == "42501" {
+            await loadMembership()
         } catch {
             if !auth.hasSession { reset() }
             notice = error.localizedDescription
@@ -279,6 +312,7 @@ final class ClubStore {
     }
 
     private func reset() {
+        accessGeneration = UUID()
         defaults.removeObject(forKey: modeKey)
         isPreview = false
         state = .sample()
@@ -289,6 +323,8 @@ final class ClubStore {
         completingProfile = false
         pendingCreation = nil
         catalog = []
+        alumniProfile = nil
+        alumniApplications = []
         viewingAsMember = false
         phase = .welcome
     }
@@ -297,7 +333,7 @@ final class ClubStore {
         try await serialized {
             guard !self.isPreview else { throw ClubFailure("Sign in to manage your account.") }
             _ = try await self.request("rest/v1/rpc/delete_account", body: Data("{}".utf8))
-            MessageMailbox.clearAccount(self.me.id)
+            MessageMailbox.clearAccount(self.alumniProfile?.id ?? self.me.id)
             self.defaults.removeObject(forKey: self.libraryKey)
             try await self.auth.signOut()
             self.reset()
@@ -311,6 +347,7 @@ final class ClubStore {
 
     func saveProfile(_ member: Member) async throws {
         guard member.id == state.myID else { throw ClubFailure("You can edit your own profile.") }
+        if isAlumniAccount { try await saveAlumniProfile(member); return }
         try await change("save_profile", ["entry": member]) { sample in
             guard let index = sample.members.firstIndex(where: { $0.id == member.id }) else { throw ClubFailure("Profile unavailable.") }
             sample.members[index] = member
@@ -370,7 +407,7 @@ final class ClubStore {
     }
 
     func walletPass(eventID: String) async throws -> Data {
-        guard walletAvailable else { throw ClubFailure("Verify your USC email to add a pass to Wallet.") }
+        guard walletAvailable else { throw ClubFailure("Verify your email to add a pass to Wallet.") }
         if isPreview {
             guard let ticket = tickets.first(where: { $0.eventID == eventID }) else { throw ClubFailure("RSVP to this event first.") }
             struct SamplePass: Encodable { let sample: Bool; let eventID: String; let sampleTicketID: String }
@@ -405,6 +442,38 @@ final class ClubStore {
                 try await self.readLiveState(endpoint, body: JSONSerialization.data(withJSONObject: parameters))
             }
         }
+    }
+
+    func sampleApplicationsForReview() -> [AlumniApplication] {
+        sampleClubs?.alumniApplications?[club.id] ?? (club.id == CommunityState.pilot.id ? [.sample()] : [])
+    }
+
+    func decideSampleApplication(_ id: UUID, approve: Bool) throws {
+        var applications = sampleApplicationsForReview()
+        guard let index = applications.firstIndex(where: { $0.id == id }), var library = sampleClubs else {
+            throw ClubFailure("This request is unavailable.")
+        }
+        let decision: AlumniApplication.Status = approve ? .approved : .declined
+        if applications[index].status == decision { return }
+        guard applications[index].status == .pending else { throw ClubFailure("This request has already been reviewed.") }
+        applications[index].status = decision
+        applications[index].decidedAt = .now
+        var queues = library.alumniApplications ?? [:]
+        queues[club.id] = applications
+        library.alumniApplications = queues
+        var revised = state
+        let application = applications[index]
+        let memberID = "demo-approved-" + id.uuidString.lowercased()
+        if approve && !revised.members.contains(where: { $0.id == memberID }) {
+            var member = Member(id: memberID, name: application.name, kind: .alumni)
+            member.graduationTerm = application.graduationTerm
+            member.graduationYear = application.graduationYear
+            revised.members.append(member)
+        }
+        library.memberships[club.id] = revised
+        defaults.set(try JSONEncoder().encode(library), forKey: libraryKey)
+        sampleClubs = library
+        activate(revised)
     }
 
     private func persist(_ sample: CommunityState) throws {
@@ -446,6 +515,7 @@ final class ClubStore {
     }
 
     private func request(_ path: String, body: Data) async throws -> Data {
+        let generation = accessGeneration
         let token = try await auth.accessToken()
         var request = URLRequest(url: PilotConfiguration.url.appending(path: path), cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 25)
         request.httpMethod = "POST"
@@ -454,11 +524,12 @@ final class ClubStore {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = body
         let (data, response) = try await URLSession.shared.data(for: request)
+        guard accessGeneration == generation else { throw CancellationError() }
         guard let http = response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
         guard (200..<300).contains(http.statusCode) else {
             if let problem = try? JSONDecoder().decode(ServerError.self, from: data) {
                 if problem.code == "28000" {
-                    // A previously accepted campus identity can lose eligibility.
+                    // Credentials are discarded when the verified identity is no longer recognized.
                     // Clear the roster and credentials immediately on that response.
                     try? await auth.signOut()
                     reset()
