@@ -24,7 +24,7 @@
 <body><main>
   <header><img src="./icon.png" alt="">Club Connect</header>
   <h1 id="title">Join a USC club</h1>
-  <p id="detail">Open your invitation in Club Connect and verify your USC email to join.</p>
+  <p id="detail">Open Club Connect to join with a USC address or request alumni membership using a personal email.</p>
   <a class="open" id="open" href="clubconnect://join/menasa">Open in Club Connect</a>
   <aside><strong>Installing the pilot?</strong><p>Ask the club organizer for a TestFlight invitation. After accepting it, install Club Connect in TestFlight, then return to this link.</p></aside>
 </main>
@@ -37,8 +37,8 @@
   document.getElementById('open').href = 'clubconnect://join/' + club;
   if (club === 'menasa') document.getElementById('title').textContent = 'Join MENASA';
   if (query.get('alumni') === '1' && (requested === 'menasa' || uuid.test(requested || ''))) {
-    document.getElementById('title').textContent = club === 'menasa' ? 'Join MENASA as an alum' : 'Your alumni invitation';
-    document.getElementById('detail').textContent = 'Open Club Connect and verify the personal email address your organizer invited. Then add your name and graduation term to join the club.';
+    document.getElementById('title').textContent = club === 'menasa' ? 'Apply to MENASA as an alum' : 'Request alumni membership';
+    document.getElementById('detail').textContent = 'Verify your personal email, add your name and graduation term, and send a membership request. A club organizer will review it.';
     document.getElementById('open').href = 'clubconnect://join/' + club + '?alumni=1';
   } else if (uuid.test(id || '')) {
     document.getElementById('title').textContent = 'Your event invitation';
