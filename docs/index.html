@@ -4,10 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="color-scheme" content="light dark">
-  <meta name="theme-color" content="#813d2d">
+  <meta name="theme-color" content="#FBF8F4" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#191513" media="(prefers-color-scheme: dark)">
   <title>Your invitation · Club Connect</title>
   <style>
-    :root { color-scheme: light dark; --paper:#faf6ef; --ink:#2b231f; --muted:#625651; --accent:#813d2d; --button:#fff8ed }
+    :root { color-scheme: light dark; --paper:#FBF8F4; --ink:#291D19; --muted:#66574f; --accent:#80523F; --button:#fff }
     @media(prefers-color-scheme:dark){:root{--paper:#211d19;--ink:#faf3e5;--muted:#d5c5b6;--accent:#efb193;--button:#261b16}}
     *{box-sizing:border-box}
     body{margin:0;min-height:100svh;display:grid;place-items:center;background:var(--paper);color:var(--ink);font:1rem/1.55 -apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif}
@@ -35,7 +36,11 @@
   const club = requested === 'menasa' || uuid.test(requested || '') ? requested.toLowerCase() : 'menasa';
   document.getElementById('open').href = 'clubconnect://join/' + club;
   if (club === 'menasa') document.getElementById('title').textContent = 'Join MENASA';
-  if (uuid.test(id || '')) {
+  if (query.get('alumni') === '1' && (requested === 'menasa' || uuid.test(requested || ''))) {
+    document.getElementById('title').textContent = club === 'menasa' ? 'Join MENASA as an alum' : 'Your alumni invitation';
+    document.getElementById('detail').textContent = 'Open Club Connect and verify the personal email address your organizer invited. Then add your name and graduation term to join the club.';
+    document.getElementById('open').href = 'clubconnect://join/' + club + '?alumni=1';
+  } else if (uuid.test(id || '')) {
     document.getElementById('title').textContent = 'Your event invitation';
     document.getElementById('detail').textContent = 'Open this club event to see the details and RSVP.';
     document.getElementById('open').href = 'clubconnect://event/' + id + '?club=' + club + (query.get('sample') === '1' ? '&sample=1' : '');
