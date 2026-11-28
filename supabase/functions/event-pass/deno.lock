@@ -1,0 +1,62 @@
+{
+  "version": "5",
+  "specifiers": {
+    "npm:passkit-generator@3.7.0": "3.7.0"
+  },
+  "npm": {
+    "@hapi/hoek@9.3.0": {
+      "integrity": "sha512-/c6rf4UJlmHlC9b5BaNvzAcFv7HZ2QHaV0D4/HNlBdvFnvQq8RI4kYdhyPCl7Xj+oWvTWQ8ujhqS53LIgAe6KQ=="
+    },
+    "@hapi/topo@5.1.0": {
+      "integrity": "sha512-foQZKJig7Ob0BMAYBfcJk8d77QtOe7Wo4ox7ff1lQYoNNAb6jwcY1ncdoy2e9wQZzvNy7ODZCYJkK8kzmcAnAg==",
+      "dependencies": [
+        "@hapi/hoek"
+      ]
+    },
+    "@sideway/address@4.1.5": {
+      "integrity": "sha512-IqO/DUQHUkPeixNQ8n0JA6102hT9CmaljNTPmQ1u8MEhBo/R4Q8eKLN/vGZxuebwOroDB4cbpjheD4+/sKFK4Q==",
+      "dependencies": [
+        "@hapi/hoek"
+      ]
+    },
+    "@sideway/formula@3.0.1": {
+      "integrity": "sha512-/poHZJJVjx3L+zVD6g9KgHfYnb443oi7wLu/XKojDviHy6HOEOA6z1Trk5aR1dGcmPenJEgb2sK2I80LeS3MIg=="
+    },
+    "@sideway/pinpoint@2.0.0": {
+      "integrity": "sha512-RNiOoTPkptFtSVzQevY/yWtZwf/RxyVnPy/OcA9HBM3MlGDnBEYL5B41H0MTn0Uec8Hi+2qUtTfG2WWZBmMejQ=="
+    },
+    "do-not-zip@1.0.0": {
+      "integrity": "sha512-Pgd81ET43bhAGaN2Hq1zluSX1FmD7kl7KcV9ER/lawiLsRUB9pRA5y8r6us29Xk6BrINZETO8TjhYwtwafWUww=="
+    },
+    "joi@17.13.4": {
+      "integrity": "sha512-1RuuER6kmt8K8I3nIWvPZKi5RQCb568ZPyY4Pwjlua+yo+63ZTmIwxLZH0heBmiKN4uxjvCiarDrjaeH84xicQ==",
+      "dependencies": [
+        "@hapi/hoek",
+        "@hapi/topo",
+        "@sideway/address",
+        "@sideway/formula",
+        "@sideway/pinpoint"
+      ]
+    },
+    "node-forge@1.4.4": {
+      "integrity": "sha512-T6VRRpF3+czIGcXW/LOeoD7Ej28d8CF1UMEAbJyJRUtYMvyXAgxUPW2kbUibumvV9LiUQAznJOFyeYclzSJMMg=="
+    },
+    "passkit-generator@3.7.0": {
+      "integrity": "sha512-jeonV+XhPgmOEdrm19/sMxUJhOb5VfSLv1KKbENz8mtvInZ44a6LZNM8vduXaVCIZAxMTiP9VhrNs66Lwn7TKA==",
+      "dependencies": [
+        "do-not-zip",
+        "joi",
+        "node-forge",
+        "tslib"
+      ]
+    },
+    "tslib@2.9.1": {
+      "integrity": "sha512-a4Ux9VKuIMHsOS7ENbEq6hK2ZGYIT27Rtl0E4eD9KqwxhKiQeMZE/9xb3IdYwWaSOyIBQLExhQgXDTYoiCxnWA=="
+    }
+  },
+  "workspace": {
+    "dependencies": [
+      "npm:passkit-generator@3.7.0"
+    ]
+  }
+}

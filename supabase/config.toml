@@ -1,0 +1,29 @@
+project_id = "clubconnect"
+
+[functions.event-pass]
+verify_jwt = false
+
+[auth]
+additional_redirect_urls = ["clubconnect://auth/callback"]
+enable_anonymous_sign_ins = false
+
+[auth.email]
+enabled = true
+enable_confirmations = true
+otp_length = 6
+otp_expiry = 600
+
+[auth.hook.before_user_created]
+enabled = true
+uri = "pg-functions://postgres/public/before_usc_signup"
+
+[auth.external.apple]
+enabled = false
+
+[auth.email.template.confirmation]
+subject = "Verify your email for Club Connect"
+content_path = "./supabase/templates/sign-in.html"
+
+[auth.email.template.magic_link]
+subject = "Your Club Connect sign-in link and code"
+content_path = "./supabase/templates/sign-in.html"
