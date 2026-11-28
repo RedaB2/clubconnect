@@ -151,6 +151,20 @@ final class OnboardingTests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Alumni UI Fixture"].waitForExistence(timeout: 8))
     }
 
+    func testVerifiedNonmemberCanDeleteTheirOwnAccount() throws {
+        let fixture = try hostedFixture("DELETION")
+        let app = welcome()
+        app.buttons["alumni-sign-up"].tap()
+        verify(app, email: fixture.email, code: fixture.code)
+        app.buttons["Account"].tap()
+        app.buttons["Delete account"].tap()
+        XCTAssertTrue(app.buttons["Delete my account"].waitForExistence(timeout: 5))
+        app.buttons["Delete my account"].tap()
+        XCTAssertTrue(app.alerts["Account deleted"].waitForExistence(timeout: 18))
+        app.buttons["Done"].tap()
+        XCTAssertTrue(app.buttons["returning-sign-in"].waitForExistence(timeout: 5))
+    }
+
     private func waitForLabel(_ text: String, on element: XCUIElement) async {
         let status = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", text), object: element)
         await fulfillment(of: [status], timeout: 18)

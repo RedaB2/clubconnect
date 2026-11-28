@@ -2,7 +2,7 @@
 
 A native iPhone and iPad community app for USC students and alumni. MENASA is the pilot club. Students can use a verified USC address across campus clubs. Alumni who have lost their USC address can create an account with a personal email and apply to individual clubs.
 
-<img src="media/campus-clubs-iphone.jpg" alt="Campus club directory in the Club Connect palette" width="235"> <img src="media/club-page-iphone.jpg" alt="MENASA’s club page with upcoming events in its own colors" width="235">
+<img src="media/welcome-iphone.jpg" alt="Campus, alumni, and returning sign-in on the Release welcome screen" width="235"> <img src="media/campus-clubs-iphone.jpg" alt="Campus club directory in the Club Connect palette" width="235"> <img src="media/club-page-iphone.jpg" alt="MENASA’s club page with upcoming events in its own colors" width="235">
 
 <img src="media/people-iphone.jpg" alt="The MENASA directory in dark mode" width="215"> <img src="media/inbox-iphone.jpg" alt="The member inbox in light mode" width="215"> <img src="media/conversation-iphone.jpg" alt="A club conversation and its rounded message composer" width="215">
 
@@ -25,7 +25,7 @@ A native iPhone and iPad community app for USC students and alumni. MENASA is th
 3. The club’s organizer opens **Clubs → their club → Membership requests**, reviews the applicant’s name, verified email, graduation term, and note, then approves or declines. Each approval opens that club’s events, people, and messaging. An applicant can send a new request after a withdrawal or decline.
 4. To point alumni at a particular club, use **Share alumni signup** on its page. The shared link selects the club. The recipient still needs an organizer’s approval. Installing the internal TestFlight build requires separate access to the beta.
 
-<img src="media/welcome-iphone.jpg" alt="Club Connect with USC and personal-email signup options" width="235"> <img src="media/alumni-review-iphone.jpg" alt="An organizer reviewing a fictional alum's application in the sample community" width="235">
+<img src="media/alumni-requests-iphone.jpg" alt="Two alumni applications awaiting independent decisions" width="235"> <img src="media/alumni-clubs-iphone.jpg" alt="One approved club and one pending request in a two-club membership test" width="235"> <img src="media/alumni-review-iphone.jpg" alt="An organizer reviewing a fictional alum's application in the sample community" width="235">
 
 For the comparison of onboarding approaches and the pilot design decision, see [Joining a club](design/onboarding.md).
 
