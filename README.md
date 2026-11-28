@@ -10,6 +10,8 @@ A native iPhone and iPad community app for USC students and alumni. MENASA is th
 
 A brief animation of the Club Connect mark opens a cold launch. First-time visitors can swipe through three examples before signup. They show a club gathering, the ticket used at check-in, and a conversation with an alum. Skip or finish to go to account choices. People opening a shared link go directly to that flow, and returning members go straight back to their account.
 
+[Watch the first-launch experience](media/first-launch.mp4)
+
 1. Choose the USC sign-in path or **Join as an alum** with a personal email. A club link can take an alum directly into signup. Open the verification link on the device that started sign-in, or enter the email’s six-digit code in the app. Both expire after ten minutes.
 2. Enter a name, graduation term, and year, then choose your first club. A personal-email alum saves a profile before applying to any clubs. USC account holders can also create a club. Current students also choose freshman, sophomore, junior, senior, or graduate student. A spring graduate becomes an alum on June 1 and a fall graduate on January 1 of the following year, in Los Angeles time.
 3. Use **Clubs** to find, join, or create clubs. Open a club to see its next three events. Tap a date to open the event, or **See all upcoming events** for a longer calendar. The club menu in Events, People, and Messages switches the active community.
