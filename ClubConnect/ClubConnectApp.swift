@@ -4,6 +4,27 @@ import SwiftUI
 struct ClubConnectApp: App {
     @State private var store = ClubStore()
 
+    init() {
+        let defaults = UserDefaults.standard
+        #if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains("-ClubConnectResetIntroduction") {
+            defaults.set(false, forKey: introductionCompletedKey)
+            defaults.removeObject(forKey: "clubconnect.incoming-link")
+            return
+        }
+        if arguments.contains("-ClubConnectFreshDemo") {
+            defaults.set(true, forKey: introductionCompletedKey)
+            return
+        }
+        #endif
+        // Previous builds saved the active club even after the member signed out.
+        if defaults.object(forKey: introductionCompletedKey) == nil,
+           defaults.string(forKey: "clubconnect.active-club") != nil {
+            defaults.set(true, forKey: introductionCompletedKey)
+        }
+    }
+
     var body: some Scene {
         WindowGroup {
             AppRoot()
@@ -12,6 +33,8 @@ struct ClubConnectApp: App {
         }
     }
 }
+
+private let introductionCompletedKey = "clubconnect.introduction-completed"
 
 private enum Destination: Hashable { case events, people, club, messages, profile }
 
@@ -49,6 +72,8 @@ private struct AppRoot: View {
     @Environment(ClubStore.self) private var store
     @Environment(\.scenePhase) private var scenePhase
     @State private var tab = Destination.events
+    @State private var showingLaunch = true
+    @AppStorage(introductionCompletedKey) private var didFinishIntroduction = false
     // Email verification may relaunch the app. Persist only the validated club/event route.
     @AppStorage("clubconnect.incoming-link") private var pendingLink = ""
     private var route: Invitation? { URL(string: pendingLink).flatMap(Invitation.init) }
@@ -62,31 +87,47 @@ private struct AppRoot: View {
     @State private var linkedApplicationID: String?
     @State private var presentedApplicationLink: String?
 
-    var body: some View {
-        Group {
-            switch store.phase {
-            case .loading: ProgressView("Opening Club Connect…")
-            case .welcome:
+    @ViewBuilder private var content: some View {
+        switch store.phase {
+        case .loading: ProgressView("Opening Club Connect…")
+        case .welcome:
+            if !didFinishIntroduction && route == nil {
+                FirstRunIntroduction { didFinishIntroduction = true }
+            } else {
                 WelcomeView(sampleInvitation: route?.sample == true, alumniInvitation: route?.alumni == true,
                             invitedClubName: route.flatMap { link in
                                 store.catalog.first { $0.id == link.clubID }?.club.name ?? (link.clubID == "menasa" ? "MENASA" : nil)
                             })
-            case .enrollment: EnrollmentView()
-            case .alumniClubs: AlumniMembershipView(linkedClub: $linkedApplicationID)
-            case .community: tabs
-            case .reconnect:
-                ContentUnavailableView {
-                    Label("Couldn’t load your club", systemImage: "wifi.exclamationmark")
-                } description: {
-                    Text("Check your connection and try again.")
-                } actions: {
-                    Button("Try again") { Task { await store.loadMembership() } }
-                    Button("Sign out") { Task { try? await store.leaveSession() } }
-                }
+            }
+        case .enrollment: EnrollmentView()
+        case .alumniClubs: AlumniMembershipView(linkedClub: $linkedApplicationID)
+        case .community: tabs
+        case .reconnect:
+            ContentUnavailableView {
+                Label("Couldn’t load your club", systemImage: "wifi.exclamationmark")
+            } description: {
+                Text("Check your connection and try again.")
+            } actions: {
+                Button("Try again") { Task { await store.loadMembership() } }
+                Button("Sign out") { Task { try? await store.leaveSession() } }
             }
         }
-        .task { await store.start(); followLink() }
+    }
+
+    var body: some View {
+        ZStack {
+            content
+            if showingLaunch { LaunchAppearance { showingLaunch = false } }
+        }
+        .task {
+            if route != nil { didFinishIntroduction = true }
+            await store.start()
+            followLink()
+        }
         .onChange(of: store.phase) { _, phase in
+            if phase == .enrollment || phase == .alumniClubs || phase == .community || phase == .reconnect {
+                didFinishIntroduction = true
+            }
             if phase == .enrollment || phase == .alumniClubs { awaitingFirstMembership = true }
             if phase == .welcome { awaitingFirstMembership = false; linkedApplicationID = nil }
             if phase != .community {
@@ -105,6 +146,8 @@ private struct AppRoot: View {
         }
         .onOpenURL { url in
             if url.scheme == "clubconnect", url.host == "auth", url.path == "/callback" {
+                didFinishIntroduction = true
+                showingLaunch = false
                 Task {
                     do { try await store.verifyEmailLink(url) }
                     catch { store.notice = error.localizedDescription }
@@ -112,6 +155,8 @@ private struct AppRoot: View {
                 return
             }
             guard let link = Invitation(url) else { return }
+            didFinishIntroduction = true
+            showingLaunch = false
             pendingLink = link.savedLink
             presentedApplicationLink = nil
             Task {

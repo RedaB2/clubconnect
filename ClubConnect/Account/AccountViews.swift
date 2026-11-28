@@ -34,11 +34,11 @@ struct WelcomeView: View {
                         .clipped().accessibilityHidden(true)
 
                     VStack(alignment: .leading, spacing: 12) {
-                        Text(invitedClubName.map { "Join " + $0 } ?? "Find your people at USC.")
+                        Text(invitedClubName.map { "Join " + $0 } ?? "Join your USC community.")
                             .font(.system(size: headlineSize, weight: .semibold, design: .serif))
                             .tracking(-0.9).fixedSize(horizontal: false, vertical: true)
                             .accessibilityAddTraits(.isHeader)
-                        Text("Meet the students and alumni in your clubs, and see what’s coming up on campus.")
+                        Text("Use your USC email, or join as an alum with a personal email address.")
                             .font(.body).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
