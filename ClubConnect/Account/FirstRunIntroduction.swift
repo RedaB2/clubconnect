@@ -15,22 +15,9 @@ struct FirstRunIntroduction: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 9) {
-                Image("ClubMark").resizable().scaledToFit().frame(width: 28, height: 28)
-                    .accessibilityLabel("Club Connect")
-                    .accessibilityHidden(!typeSize.isAccessibilitySize)
-                if !typeSize.isAccessibilitySize {
-                    Text("Club Connect").font(.headline).foregroundStyle(theme.ink)
-                }
-                Spacer(minLength: 8)
-                Button(action: onFinish) {
-                    Text("Skip").font(.subheadline.weight(.semibold))
-                        .frame(minWidth: 44, minHeight: 44)
-                }
-                .accessibilityIdentifier("intro-skip")
-            }
-            .frame(maxWidth: 1000)
-            .padding(.horizontal, 24)
+            AccountWordmark()
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .padding(.horizontal, 24)
 
             GeometryReader { geometry in
                 TabView(selection: $page) {
@@ -100,8 +87,8 @@ struct FirstRunIntroduction: View {
 
     private func introduction<Preview: View>(_ index: Int, title: LocalizedStringKey, detail: LocalizedStringKey,
                                               size: CGSize, @ViewBuilder preview: () -> Preview) -> some View {
-        let columns = size.width >= 740 && !typeSize.isAccessibilitySize
-        let heading = VStack(alignment: .leading, spacing: 12) {
+        let columns = size.width >= 740 && size.width > size.height && !typeSize.isAccessibilitySize
+        let heading = VStack(spacing: 12) {
             Text(title)
                 .font(.system(size: titleSize, weight: .semibold, design: .serif))
                 .tracking(-0.8)
@@ -111,8 +98,9 @@ struct FirstRunIntroduction: View {
                 .accessibilityFocused($focusedHeading, equals: index)
             Text(detail).font(.body).foregroundStyle(theme.ink.opacity(0.8))
         }
+        .multilineTextAlignment(.center)
         .fixedSize(horizontal: false, vertical: true)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity)
 
         return ScrollView {
             Group {
@@ -122,7 +110,7 @@ struct FirstRunIntroduction: View {
                         preview().frame(maxWidth: 440)
                     }
                 } else {
-                    VStack(alignment: .leading, spacing: 26) {
+                    VStack(spacing: 26) {
                         if typeSize.isAccessibilitySize { heading }
                         preview()
                         if !typeSize.isAccessibilitySize { heading }

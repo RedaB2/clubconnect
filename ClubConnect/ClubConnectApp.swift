@@ -117,6 +117,7 @@ private struct AppRoot: View {
     var body: some View {
         ZStack {
             content
+                .accessibilityHidden(showingLaunch)
             if showingLaunch { LaunchAppearance { showingLaunch = false } }
         }
         .task {

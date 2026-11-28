@@ -1,5 +1,22 @@
 import SwiftUI
 
+struct AccountWordmark: View {
+    @Environment(\.brandTheme) private var theme
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ClubConnectMark().frame(width: 28, height: 28)
+            if !typeSize.isAccessibilitySize {
+                Text("Club Connect").font(.headline).foregroundStyle(theme.ink)
+            }
+        }
+        .fixedSize(horizontal: true, vertical: false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Club Connect")
+    }
+}
+
 struct WelcomeView: View {
     @Environment(ClubStore.self) private var store
     @Environment(\.brandTheme) private var theme
@@ -13,17 +30,18 @@ struct WelcomeView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    HStack(spacing: 10) {
-                        Image("ClubMark").resizable().frame(width: 30, height: 30).accessibilityHidden(true)
-                        Text("Club Connect").font(.headline)
-                        Spacer()
+                VStack(spacing: 0) {
+                    HStack(spacing: 8) {
+                        Color.clear.frame(minWidth: 0, maxWidth: .infinity).frame(height: 1)
+                            .accessibilityHidden(true)
+                        AccountWordmark()
                         Button { entry = .returning } label: {
                             Text("Sign in").padding(.horizontal, 3)
                         }.buttonStyle(.bordered)
                             .frame(minHeight: 44)
                             .buttonBorderShape(.capsule)
                             .accessibilityIdentifier("returning-sign-in")
+                            .frame(minWidth: 0, maxWidth: .infinity, alignment: .trailing)
                     }
                     .padding(.horizontal, 22).padding(.vertical, 14)
 
@@ -33,21 +51,24 @@ struct WelcomeView: View {
                         .frame(height: typeSize.isAccessibilitySize ? 155 : 265)
                         .clipped().allowsHitTesting(false).accessibilityHidden(true)
 
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(spacing: 12) {
                         Text(invitedClubName.map { "Join " + $0 } ?? "Join your USC community.")
                             .font(.system(size: headlineSize, weight: .semibold, design: .serif))
                             .tracking(-0.9).fixedSize(horizontal: false, vertical: true)
+                            .foregroundStyle(theme.ink)
                             .accessibilityAddTraits(.isHeader)
                         Text("Use your USC email, or join as an alum with a personal email address.")
                             .font(.body).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 440)
                     .padding(.horizontal, 24).padding(.top, 27)
 
                     VStack(spacing: 8) {
-                        AccountAction("Join with USC email", systemImage: "arrow.right") { entry = .campus }
+                        AccountAction("USC Email", systemImage: "arrow.right") { entry = .campus }
                             .accessibilityIdentifier("usc-sign-in")
-                        Button("Join as an alum") { entry = .alumni }
+                        Button("Alum") { entry = .alumni }
                             .font(.headline).frame(minHeight: 44).accessibilityIdentifier("alumni-sign-up")
                         #if DEBUG
                         Button(sampleInvitation ? "Open sample invitation" : "Explore the sample community") {
@@ -55,7 +76,9 @@ struct WelcomeView: View {
                         }
                         .frame(minHeight: 44).accessibilityIdentifier("explore-demo")
                         #endif
-                    }.padding(24)
+                    }
+                    .frame(maxWidth: 440)
+                    .padding(24)
                 }.frame(maxWidth: 600)
                     .frame(maxWidth: .infinity)
             }
@@ -145,16 +168,17 @@ private struct EmailEntryView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
+            VStack(spacing: 22) {
                 Image(systemName: awaitingVerification ? "envelope.open" : kind == .alumni ? "envelope.badge.person.crop" : "envelope")
                     .font(.title2).foregroundStyle(theme.accent).padding(14)
                     .background(theme.wash, in: RoundedRectangle(cornerRadius: 15))
                     .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(spacing: 8) {
                     Text(title).font(.system(.largeTitle, design: .serif, weight: .semibold)).accessibilityAddTraits(.isHeader)
                     if awaitingVerification { Text(email).font(.headline).textSelection(.enabled) }
                     Text(instruction).foregroundStyle(.secondary)
                 }
+                .multilineTextAlignment(.center)
                 if awaitingVerification { codeEntry } else { emailEntry }
                 if busy { ProgressView("Contacting Club Connect…") }
                 if let problem { Text(problem).font(.callout).foregroundStyle(.primary).accessibilityLabel("Sign-in error. " + problem) }

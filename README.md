@@ -8,11 +8,11 @@ A native iPhone and iPad community app for USC students and alumni. MENASA is th
 
 ## Using the pilot
 
-A brief animation of the Club Connect mark opens a cold launch. First-time visitors can swipe through three examples before signup. They show a club gathering, the ticket used at check-in, and a conversation with an alum. Skip or finish to go to account choices. People opening a shared link go directly to that flow, and returning members go straight back to their account.
+On cold launch, the Club Connect mark and name appear together. The mark grows to fill the screen and reveals the app. First-time visitors can swipe through three examples before signup. They show a club gathering, the ticket used at check-in, and a conversation with an alum. Tap **Get started** on the third page to choose how to join or sign in. People opening a shared link go directly to that flow, and returning members go straight back to their account.
 
 [Watch the first-launch experience](media/first-launch.mp4)
 
-1. Choose the USC sign-in path or **Join as an alum** with a personal email. A club link can take an alum directly into signup. Open the verification link on the device that started sign-in, or enter the email’s six-digit code in the app. Both expire after ten minutes.
+1. Choose **USC Email** to use your USC address or **Alum** to use a personal address. A club link can take an alum directly into signup. Open the verification link on the device that started sign-in, or enter the email’s six-digit code in the app. Both expire after ten minutes.
 2. Enter a name, graduation term, and year, then choose your first club. A personal-email alum saves a profile before applying to any clubs. USC account holders can also create a club. Current students also choose freshman, sophomore, junior, senior, or graduate student. A spring graduate becomes an alum on June 1 and a fall graduate on January 1 of the following year, in Los Angeles time.
 3. Use **Clubs** to find, join, or create clubs. Open a club to see its next three events. Tap a date to open the event, or **See all upcoming events** for a longer calendar. The club menu in Events, People, and Messages switches the active community.
 4. The campus directory, account screens, and personal profile use Club Connect’s ivory, white, and brown palette. Each club’s page, event details, member directory, and conversations use its own colors. Organizers can change the logo and both colors in **Edit club**. **View as a member** hides management tools. **Step down as organizer** gives up the role. A sole organizer chooses a successor before stepping down. MENASA’s initial organizer can redeem the private invitation in Profile.
@@ -24,7 +24,7 @@ A brief animation of the Club Connect mark opens a cold launch. First-time visit
 
 ### Join with a personal email
 
-1. Choose **Join as an alum**, verify your personal email, and create a profile with your name and a past graduation term. You can do this before choosing a club.
+1. Choose **Alum**, verify your personal email, and create a profile with your name and a past graduation term. You can do this before choosing a club.
 2. Find your former club and tap **Request to join**. You can include a short note about when you were involved. You can apply to several clubs at once. If MENASA approves you while another club is deciding, MENASA appears in **My clubs** and the other club stays under **Your requests**. Each organizer only reviews their own club’s applications.
 3. The club’s organizer opens **Clubs → their club → Membership requests**, reviews the applicant’s name, verified email, graduation term, and note, then approves or declines. Each approval opens that club’s events, people, and messaging. An applicant can send a new request after a withdrawal or decline.
 4. To point alumni at a particular club, use **Share alumni signup** on its page. The shared link selects the club. The recipient still needs an organizer’s approval. Installing the internal TestFlight build requires separate access to the beta.

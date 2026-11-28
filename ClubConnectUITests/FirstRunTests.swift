@@ -14,9 +14,11 @@ final class FirstRunTests: XCTestCase {
         record("01 – First introduction page")
         app.buttons["intro-next"].tap()
         XCTAssertTrue(app.staticTexts["intro-page-1"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["Skip"].exists)
         record("02 – Second introduction page")
         app.buttons["intro-next"].tap()
         XCTAssertTrue(app.staticTexts["intro-page-2"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["Skip"].exists)
         record("03 – Third introduction page")
         XCTAssertTrue(app.buttons["intro-finish"].waitForExistence(timeout: 5))
         app.buttons["intro-finish"].tap()
@@ -26,14 +28,16 @@ final class FirstRunTests: XCTestCase {
         assertAccountAccess(app)
     }
 
-    func testSkippingTheSecondPagePersistsAcrossLaunches() {
+    func testBackAndSwipeNavigationLeadToReturningSignIn() {
         let app = firstRun()
         app.buttons["intro-next"].tap()
         app.buttons["intro-back"].tap()
         XCTAssertTrue(app.staticTexts["intro-page-0"].waitForExistence(timeout: 5))
         app.swipeLeft()
         XCTAssertTrue(app.staticTexts["intro-page-1"].waitForExistence(timeout: 5))
-        app.buttons["intro-skip"].tap()
+        app.swipeLeft()
+        XCTAssertTrue(app.staticTexts["intro-page-2"].waitForExistence(timeout: 5))
+        app.buttons["intro-finish"].tap()
         assertAccountAccess(app)
         relaunch(app)
         assertAccountAccess(app)
@@ -49,12 +53,14 @@ final class FirstRunTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Reconnect with your club"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.textFields["account-email"].exists)
         XCTAssertTrue(app.staticTexts["Verify your personal email to create an alumni profile and request to join MENASA."].exists)
-        XCTAssertFalse(app.buttons["intro-skip"].exists)
+        XCTAssertFalse(app.buttons["intro-next"].exists)
     }
 
     func testReturningCommunityMemberAndColdEventLinkBypassIntroduction() throws {
         let app = firstRun()
-        app.buttons["intro-skip"].tap()
+        app.buttons["intro-next"].tap()
+        app.buttons["intro-next"].tap()
+        app.buttons["intro-finish"].tap()
         app.buttons["explore-demo"].tap()
         XCTAssertTrue(app.buttons["event-a1000000-0000-4000-8000-000000000001"].waitForExistence(timeout: 10))
         app.terminate()
@@ -62,13 +68,13 @@ final class FirstRunTests: XCTestCase {
         app.launchArguments = ["-ClubConnectResetIntroduction"] + locale
         app.launch()
         XCTAssertTrue(app.buttons["event-a1000000-0000-4000-8000-000000000001"].waitForExistence(timeout: 10))
-        XCTAssertFalse(app.buttons["intro-skip"].exists)
+        XCTAssertFalse(app.buttons["intro-next"].exists)
         app.terminate()
         app.launchArguments = locale
         app.open(try XCTUnwrap(URL(string: "clubconnect://event/a1000000-0000-4000-8000-000000000002?sample=1")))
         XCTAssertTrue(app.buttons["Close"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["After graduation"].firstMatch.exists)
-        XCTAssertFalse(app.buttons["intro-skip"].exists)
+        XCTAssertFalse(app.buttons["intro-next"].exists)
     }
 
     func testLargestDynamicTypeKeepsActionsReachable() {
@@ -105,7 +111,7 @@ final class FirstRunTests: XCTestCase {
         app.launchArguments = cleanLaunch + locale + extra
         app.launch()
         XCTAssertTrue(app.staticTexts["intro-page-0"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["intro-skip"].exists)
+        XCTAssertFalse(app.buttons["Skip"].exists)
         return app
     }
 
@@ -117,9 +123,9 @@ final class FirstRunTests: XCTestCase {
 
     private func assertAccountAccess(_ app: XCUIApplication) {
         XCTAssertTrue(app.buttons["returning-sign-in"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["usc-sign-in"].exists)
-        XCTAssertTrue(app.buttons["alumni-sign-up"].exists)
-        XCTAssertFalse(app.buttons["intro-skip"].exists)
+        XCTAssertEqual(app.buttons["usc-sign-in"].label, "USC Email")
+        XCTAssertEqual(app.buttons["alumni-sign-up"].label, "Alum")
+        XCTAssertFalse(app.buttons["intro-finish"].exists)
     }
 
     private func tapIfReachable(_ button: XCUIElement, in app: XCUIApplication) {

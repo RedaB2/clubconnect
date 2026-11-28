@@ -6,13 +6,13 @@ A first-time member has two questions. “Is this my club?” and “What will p
 
 | Approach | What it gives a new member | Fit for the USC pilot |
 | --- | --- | --- |
-| Feature tour | A walkthrough can introduce Events, People, Messages, and Wallet before sign-in. | Before signup, show three concrete moments from club life. Let people skip, and introduce the actual Calendar and Wallet controls when someone RSVPs. Apple recommends short onboarding and teaching in context. [Apple Human Interface Guidelines](https://developer.apple.com/design/human-interface-guidelines/onboarding) |
+| Feature tour | A walkthrough can introduce Events, People, Messages, and Wallet before sign-in. | Before signup, show three concrete moments from club life. Save the interactive Calendar and Wallet controls for the moment someone RSVPs. Apple recommends short onboarding and teaching in context. [Apple Human Interface Guidelines](https://developer.apple.com/design/human-interface-guidelines/onboarding) |
 | Personalize first | Discord asks questions that change which roles and channels a new arrival sees. Duolingo asks about experience to choose a starting point. | Graduation term changes the directory someone appears in. Interests and experience can start conversations later. Asking for them during entry adds work before they change anything on screen. [Discord community onboarding](https://support.discord.com/hc/en-us/articles/11074987197975-Community-Onboarding-FAQ) · [Getting started on Duolingo](https://blog.duolingo.com/duolingo-101-how-to-learn-a-language-on-duolingo/) |
 | Start with the invitation | Slack lets someone verify a mailbox and accept a particular workspace invitation. Flighty gives people a chance to experience its features on an actual flight. | A club link tells us what the visitor came to do. Show the destination, verify their email, collect the few details peers need, then offer campus enrollment or an alumni membership request. This is how the pilot handles shared links. [Joining a Slack workspace](https://slack.com/help/articles/212675257-Join-a-Slack-workspace) · [Flighty’s first flight](https://flighty.com/help/complimentary-flighty-pro-flight) |
 
 ## The first visit
 
-A cold launch opens on Club Connect’s warm canvas. The club mark comes into view and fades into the first screen while account restoration runs. Reduce Motion reveals the destination immediately. [Apple’s launch guidance](https://developer.apple.com/design/human-interface-guidelines/launching)
+A cold launch opens on Club Connect’s warm canvas. The mark and Club Connect name appear together. After a short hold, the mark accelerates outward to fill the screen and reveal the app while account restoration runs. A tap reveals the destination immediately. People using Reduce Motion or VoiceOver go directly to it. [Apple’s launch guidance](https://developer.apple.com/design/human-interface-guidelines/launching)
 
 On the first ordinary visit, three swipeable pages show what someone can do in the app.
 
@@ -20,7 +20,7 @@ On the first ordinary visit, three swipeable pages show what someone can do in t
 2. See what it’s like to RSVP and carry a ticket to check-in on iPhone, including in Apple Wallet.
 3. Meet a fictional graduate and preview a conversation about life after USC.
 
-The examples are bundled with the app, so the introduction can open offline. **Skip** on any page and **Get started** on the final page lead to account choices and remember completion on that device. A restored account or an incoming club, event, or verification link takes the person to their destination immediately.
+The examples are bundled with the app, so the introduction can open offline. Visitors can swipe or use the page controls. **Get started** on the third page opens account choices and remembers completion on that device. A restored account or an incoming club, event, or verification link takes the person to their destination immediately.
 
 - A campus visitor verifies their USC address, creates a profile, then joins a club or creates one. Returning members can go straight to sign-in.
 - An alum can sign up with a personal email and save their profile before choosing any club. A link can point them toward a particular club. They can find another club, write an optional note, request admission, and check each decision independently.

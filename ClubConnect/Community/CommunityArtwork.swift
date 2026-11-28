@@ -52,7 +52,7 @@ struct CommunityMark: View {
             if let logoData, let logo = UIImage(data: logoData) {
                 Image(uiImage: logo).resizable()
             } else {
-                Image("ClubMark").resizable()
+                ClubConnectMark()
             }
         }
         .scaledToFit()
