@@ -31,7 +31,7 @@ struct WelcomeView: View {
                         .resizable().scaledToFill()
                         .frame(maxWidth: .infinity)
                         .frame(height: typeSize.isAccessibilitySize ? 155 : 265)
-                        .clipped().accessibilityHidden(true)
+                        .clipped().allowsHitTesting(false).accessibilityHidden(true)
 
                     VStack(alignment: .leading, spacing: 12) {
                         Text(invitedClubName.map { "Join " + $0 } ?? "Join your USC community.")
